@@ -1,0 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,700;1,700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", serif;
+
+  /* Zen Scholar Palette */
+  --color-surface: #fdfdfd;
+  --color-surface-dim: #f1f5f9;
+  --color-surface-bright: #ffffff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f8fafc;
+  --color-surface-container: #f1f5f9;
+  --color-surface-container-high: #e2e8f0;
+  --color-surface-container-highest: #cbd5e1;
+  
+  --color-on-surface: #0f172a;
+  --color-on-surface-variant: #475569;
+  
+  --color-primary: #0f172a;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #1e293b;
+  --color-on-primary-container: #f8fafc;
+  
+  --color-secondary: #334155;
+  --color-on-secondary: #ffffff;
+  
+  --color-accent: #4f46e5;
+  --color-on-accent: #ffffff;
+
+  --color-outline: #e2e8f0;
+  --color-outline-variant: #f1f5f9;
+
+  /* Radius */
+  --radius-xl: 0.75rem;
+}
+
+@layer base {
+  body {
+    @apply bg-surface text-on-surface font-sans antialiased;
+  }
+  
+  h1, h2, h3 {
+    @apply font-serif;
+  }
+}
+
+@layer utilities {
+  .card-border {
+    @apply border border-outline shadow-[0_2px_4px_rgba(0,0,0,0.02)];
+  }
+  
+  .animate-slide-up {
+    animation: slideInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
