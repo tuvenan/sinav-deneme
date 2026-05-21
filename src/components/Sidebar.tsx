@@ -4,9 +4,10 @@ import { motion } from 'motion/react';
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  onUploadClick: () => void;
 }
 
-export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
+export default function Sidebar({ activeTab, setActiveTab, onUploadClick }: SidebarProps) {
   const navItems = [
     { id: 'calisma', label: 'Çalışma Alanı', icon: BookOpen },
     { id: 'analiz', label: 'Konu Analizi', icon: TrendingUp },
@@ -36,7 +37,10 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
           </button>
         ))}
 
-        <button className="w-full mt-6 flex items-center gap-3 px-3 py-2.5 text-primary border border-outline bg-surface-bright rounded-md transition-all hover:bg-surface-dim font-semibold italic text-sm">
+        <button 
+          onClick={onUploadClick}
+          className="w-full mt-6 flex items-center gap-3 px-3 py-2.5 text-primary border border-outline bg-surface-bright rounded-md transition-all hover:bg-surface-dim font-semibold italic text-sm cursor-pointer"
+        >
           <Upload size={16} />
           <span>PDF/Kaynak Yükle</span>
         </button>

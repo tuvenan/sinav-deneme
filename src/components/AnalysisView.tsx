@@ -1,4 +1,4 @@
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, Clock, CheckCircle } from 'lucide-react';
 import { 
   BarChart, 
   Bar, 
@@ -12,8 +12,13 @@ import {
   Cell,
   Legend
 } from 'recharts';
+import type { SolveHistory } from '../types';
 
-export default function AnalysisView() {
+interface AnalysisViewProps {
+  solveHistory?: SolveHistory[];
+}
+
+export default function AnalysisView({ solveHistory = [] }: AnalysisViewProps) {
   const topics = [
     { name: 'Üslü Sayılar', score: 85, trend: 'up' },
     { name: 'Kareköklü İfadeler', score: 72, trend: 'up' },
@@ -31,11 +36,26 @@ export default function AnalysisView() {
     { day: 'Paz', solved: 20 },
   ];
 
-  const successData = [
-    { name: 'Doğru', value: 78, color: '#0f172a' },
-    { name: 'Yanlış', value: 12, color: '#e2e8f0' },
-    { name: 'Boş', value: 10, color: '#f1f5f9' },
-  ];
+  const totalSolved = solveHistory.length;
+  const correctAnswers = solveHistory.filter(h => h.isCorrect).length;
+  
+  const accuracyVal = totalSolved > 0 ? Math.round((correctAnswers / totalSolved) * 100) : 78;
+  const accuracyText = `%${accuracyVal}`;
+
+  const avgTime = totalSolved > 0 
+    ? Math.round(solveHistory.reduce((acc, curr) => acc + curr.timeSpent, 0) / totalSolved) 
+    : 54;
+
+  const successData = totalSolved > 0 
+    ? [
+        { name: 'Doğru', value: correctAnswers, color: '#0f172a' },
+        { name: 'Yanlış/Boş', value: totalSolved - correctAnswers, color: '#e2e8f0' }
+      ]
+    : [
+        { name: 'Doğru', value: 78, color: '#0f172a' },
+        { name: 'Yanlış', value: 12, color: '#e2e8f0' },
+        { name: 'Boş', value: 10, color: '#f1f5f9' },
+      ];
 
   const THEME_COLORS = {
     primary: '#0f172a',
@@ -49,6 +69,42 @@ export default function AnalysisView() {
       <div className="space-y-2">
         <h1 className="text-3xl font-serif font-bold text-primary italic">Konu Analizi</h1>
         <p className="text-on-surface-variant">Performansınızı ve akademik gelişiminizi buradan takip edebilirsiniz.</p>
+      </div>
+
+      {/* KPI Metrics Summary Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Total Questions Solved */}
+        <div className="bg-white border border-outline rounded-xl p-6 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-on-surface-variant/70">Toplam Soru</p>
+            <h4 className="text-3xl font-serif font-black italic text-primary mt-1">{totalSolved || 4}</h4>
+          </div>
+          <div className="bg-surface-dim p-2.5 rounded-lg border border-outline">
+            <TrendingUp size={20} className="text-primary" />
+          </div>
+        </div>
+
+        {/* Accuracy */}
+        <div className="bg-white border border-outline rounded-xl p-6 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-on-surface-variant/70">Doğruluk Oranı</p>
+            <h4 className="text-3xl font-serif font-black italic text-primary mt-1">{accuracyText}</h4>
+          </div>
+          <div className="bg-surface-dim p-2.5 rounded-lg border border-outline">
+            <CheckCircle size={20} className="text-secondary" />
+          </div>
+        </div>
+
+        {/* Average Time Spent */}
+        <div className="bg-white border border-outline rounded-xl p-6 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-on-surface-variant/70">Ortalama Süre</p>
+            <h4 className="text-3xl font-serif font-black italic text-primary mt-1">{avgTime} sn</h4>
+          </div>
+          <div className="bg-surface-dim p-2.5 rounded-lg border border-outline">
+            <Clock size={20} className="text-primary animate-pulse" />
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -82,8 +138,8 @@ export default function AnalysisView() {
             </ResponsiveContainer>
           </div>
           <div className="mt-4 text-center">
-            <span className="text-4xl font-serif font-black italic text-primary">%78</span>
-            <p className="text-xs font-bold text-emerald-600 mt-1 uppercase tracking-widest">+%12 bu hafta</p>
+            <span className="text-4xl font-serif font-black italic text-primary">{accuracyText}</span>
+            <p className="text-xs font-bold text-emerald-600 mt-1 uppercase tracking-widest">Başarı Dağılımı</p>
           </div>
         </div>
 

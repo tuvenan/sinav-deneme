@@ -18,6 +18,13 @@ export interface Question {
   errorType: string;
 }
 
+export interface SolveHistory {
+  questionId: string;
+  isCorrect: boolean;
+  timeSpent: number; // in seconds
+  difficulty: Difficulty;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'ai';

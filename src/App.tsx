@@ -12,7 +12,7 @@ import AnalysisView from './components/AnalysisView';
 import ResourcesView from './components/ResourcesView';
 import SettingsView from './components/SettingsView';
 import AIGuideView from './components/AIGuideView';
-import type { Question, Message, Difficulty } from './types';
+import type { Question, Message, Difficulty, SolveHistory } from './types';
 
 const INITIAL_QUESTIONS: Question[] = [
   {
@@ -81,27 +81,76 @@ export default function App() {
     }
   ]);
   const [lastErrorAnalysis, setLastErrorAnalysis] = useState<{ type: string; suggestion: string } | undefined>();
+  const [solveHistory, setSolveHistory] = useState<SolveHistory[]>(() => {
+    const saved = localStorage.getItem('lgs_solve_history');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return [
+      { questionId: "12", isCorrect: true, timeSpent: 42, difficulty: "Kolay" },
+      { questionId: "42", isCorrect: true, timeSpent: 75, difficulty: "Orta" },
+      { questionId: "87", isCorrect: false, timeSpent: 125, difficulty: "Zor" }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('lgs_solve_history', JSON.stringify(solveHistory));
+  }, [solveHistory]);
 
   const loadNewQuestion = useCallback(() => {
-    let pool = questions;
-    if (difficulty !== 'Hepsi') {
-      pool = questions.filter(q => q.difficulty === difficulty);
-    }
-    if (pool.length === 0) pool = questions;
-    
-    const random = Math.floor(Math.random() * pool.length);
-    setCurrentQuestion(pool[random]);
+    setCurrentQuestion(prev => {
+      let pool = questions;
+      if (difficulty !== 'Hepsi') {
+        pool = questions.filter(q => q.difficulty === difficulty);
+      }
+      if (pool.length === 0) pool = questions;
+      
+      let finalPool = pool;
+      if (prev) {
+        finalPool = pool.filter(q => q.id !== prev.id);
+        if (finalPool.length === 0) {
+          finalPool = pool;
+        }
+      }
+      
+      const random = Math.floor(Math.random() * finalPool.length);
+      return finalPool[random];
+    });
     setLastErrorAnalysis(undefined);
   }, [questions, difficulty]);
 
-  const handleAnswer = (isCorrect: boolean) => {
+  const handleAnswer = (isCorrect: boolean, timeSpentSeconds: number) => {
+    // Save to solve history
+    const newSolve: SolveHistory = {
+      questionId: currentQuestion.id,
+      isCorrect,
+      timeSpent: timeSpentSeconds,
+      difficulty: currentQuestion.difficulty
+    };
+    setSolveHistory(prev => [...prev, newSolve]);
+
+    const formattedTime = timeSpentSeconds > 59 
+      ? `${Math.floor(timeSpentSeconds / 60)} dk ${timeSpentSeconds % 60} sn` 
+      : `${timeSpentSeconds} saniye`;
+
+    let feedbackTimeText = '';
+    if (timeSpentSeconds < 30) {
+      feedbackTimeText = ` Bu soruyu sadece ${formattedTime} içerisinde rekor bir hızla çözdün! LGS'de zaman yönetimi açısından mükemmel durumdasın.`;
+    } else if (timeSpentSeconds > 90) {
+      feedbackTimeText = ` Bu soru üstünde ${formattedTime} harcadın. Sabırla ve odaklanarak sonuna kadar gitmen harika!`;
+    } else {
+      feedbackTimeText = ` ${formattedTime} çözüm süresi LGS standartlarına göre oldukça dengeli!`;
+    }
+
     if (isCorrect) {
       setCorrectStreak(prev => prev + 1);
       setProgress(prev => Math.min(100, prev + 5));
       const aiResponse: Message = {
         id: Date.now().toString(),
         role: 'ai',
-        text: 'Harika bir çözüm! Mantığı çok iyi kavradın. Bir sonraki soruya geçmeye hazır mısın?',
+        text: `Harika bir çözüm! Mantığı çok iyi kavradın.${feedbackTimeText} Bir sonraki soruya geçmeye hazır mısın?`,
         timestamp: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
       };
       setMessages(prev => [...prev, aiResponse]);
@@ -114,7 +163,7 @@ export default function App() {
       const aiResponse: Message = {
         id: Date.now().toString(),
         role: 'ai',
-        text: `Yanlış cevap verdin ama sorun değil. Senin için detaylı bir hata analizi hazırladım. "${currentQuestion.errorType}" kısmına dikkat etmelisin. Tekrar deneyelim mi?`,
+        text: `Yanlış cevap verdin ama sorun değil. Çözüm sürecinde ${formattedTime} harcadın.${feedbackTimeText} Senin için detaylı bir hata analizi hazırladım. "${currentQuestion.errorType}" kısmına dikkat ederek tekrar deneyelim.`,
         timestamp: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
       };
       setMessages(prev => [...prev, aiResponse]);
@@ -153,6 +202,13 @@ export default function App() {
     }, 1000);
   };
 
+  const [resourceUploadTrigger, setResourceUploadTrigger] = useState(0);
+
+  const handleUploadClick = () => {
+    setActiveTab('kaynaklar');
+    setResourceUploadTrigger(prev => prev + 1);
+  };
+
   useEffect(() => {
     loadNewQuestion();
   }, [difficulty, loadNewQuestion]);
@@ -161,7 +217,7 @@ export default function App() {
     <div className="min-h-screen bg-surface flex flex-col">
       <Header />
       <div className="flex pt-16 flex-1">
-        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onUploadClick={handleUploadClick} />
         <main className="flex-1 md:ml-64 mr-0 md:mr-[420px] bg-background">
           {activeTab === 'calisma' && (
             <QuestionArea
@@ -174,10 +230,10 @@ export default function App() {
               correctStreak={correctStreak}
             />
           )}
-          {activeTab === 'analiz' && <AnalysisView />}
-          {activeTab === 'kaynaklar' && <ResourcesView />}
+          {activeTab === 'analiz' && <AnalysisView solveHistory={solveHistory} />}
+          {activeTab === 'kaynaklar' && <ResourcesView uploadTrigger={resourceUploadTrigger} />}
           {activeTab === 'ai-rehber' && <AIGuideView />}
-          {activeTab === 'ayarlar' && <SettingsView />}
+          {activeTab === 'ayarlar' && <SettingsView solveHistory={solveHistory} />}
         </main>
         <AITutor
           messages={messages}

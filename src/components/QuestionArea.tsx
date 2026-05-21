@@ -1,12 +1,12 @@
-import { CheckCircle, Lightbulb, RefreshCw, Star, TrendingUp, XCircle } from 'lucide-react';
+import { CheckCircle, Clock, Lightbulb, RefreshCw, Star, TrendingUp, XCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Question, Difficulty } from '../types';
 
 interface QuestionAreaProps {
   question: Question;
   onNewQuestion: () => void;
-  onAnswer: (isCorrect: boolean) => void;
+  onAnswer: (isCorrect: boolean, timeSpentSeconds: number) => void;
   onHint: () => void;
   selectedDifficulty: Difficulty;
   setDifficulty: (d: Difficulty) => void;
@@ -24,17 +24,39 @@ export default function QuestionArea({
 }: QuestionAreaProps) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+
+  useEffect(() => {
+    setSeconds(0);
+    setSelectedIdx(null);
+    setIsSubmitted(false);
+  }, [question.id]);
+
+  useEffect(() => {
+    if (isSubmitted) return;
+    const interval = setInterval(() => {
+      setSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isSubmitted, question.id]);
 
   const handleSubmit = () => {
     if (selectedIdx === null || isSubmitted) return;
     setIsSubmitted(true);
-    onAnswer(question.options[selectedIdx].isCorrect);
+    onAnswer(question.options[selectedIdx].isCorrect, seconds);
   };
 
   const handleNext = () => {
     setSelectedIdx(null);
     setIsSubmitted(false);
+    setSeconds(0);
     onNewQuestion();
+  };
+
+  const formatTime = (totalSeconds: number) => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   const currentOption = selectedIdx !== null ? question.options[selectedIdx] : null;
@@ -64,15 +86,24 @@ export default function QuestionArea({
                   <span className="text-3xl font-serif font-black italic">
                     {currentOption?.isCorrect ? 'Doğru Cevap' : 'Yanlış Cevap'}
                   </span>
+                  <span className="text-sm font-sans font-medium text-on-surface-variant">
+                    Süre: {formatTime(seconds)}
+                  </span>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
           <div className="flex items-center justify-between mb-8">
-            <span className="text-[10px] font-black uppercase tracking-widest bg-surface-dim px-3 py-1 rounded-sm border border-outline text-on-surface-variant">
-              Soru #{question.id}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-black uppercase tracking-widest bg-surface-dim px-3 py-1 rounded-sm border border-outline text-on-surface-variant">
+                Soru #{question.id}
+              </span>
+              <div className="flex items-center gap-1.5 bg-surface-dim border border-outline px-3 py-1 rounded-sm text-xs font-mono text-on-surface-variant font-bold">
+                <Clock size={12} className="text-primary" />
+                <span>{formatTime(seconds)}</span>
+              </div>
+            </div>
             <div className="flex flex-col items-end gap-1">
               <div className="flex items-center gap-2">
                 <Star size={16} className="text-primary fill-primary" />
