@@ -1,0 +1,78 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile Settings",
+      "description": "Customized properties of the student, their settings, target goals, and plan details.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "targetSchool": { "type": "string" },
+        "dailyGoal": { "type": "number" },
+        "avatarSeed": { "type": "string" },
+        "notifySms": { "type": "boolean" },
+        "notifyDaily": { "type": "boolean" },
+        "notifyAiMentorship": { "type": "boolean" },
+        "notifyTime": { "type": "string" },
+        "membershipType": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "targetSchool", "dailyGoal", "avatarSeed"]
+    },
+    "SolveHistory": {
+      "title": "Solve History Entry",
+      "description": "Records representing a single solved test question under LGS preparation.",
+      "type": "object",
+      "properties": {
+        "questionId": { "type": "string" },
+        "isCorrect": { "type": "boolean" },
+        "selectedOption": { "type": "string" },
+        "timeSpentSeconds": { "type": "number" },
+        "solvedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["questionId", "isCorrect", "solvedAt"]
+    },
+    "Resource": {
+      "title": "Study Resource",
+      "description": "PDF notes or video walkthrough files created or loaded by the user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "folder": { "type": "string" },
+        "path": { "type": "string" },
+        "topic": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "type", "folder", "topic"]
+    },
+    "CompletedResource": {
+      "title": "Completed Resource Mark",
+      "description": "Simple documents tracking resource material completion progress.",
+      "type": "object",
+      "properties": {
+        "fileId": { "type": "string" },
+        "completedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fileId", "completedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User custom settings, theme profile, goals"
+    },
+    "/users/{userId}/solve_history/{historyId}": {
+      "schema": "SolveHistory",
+      "description": "History of questions solved by the student"
+    },
+    "/users/{userId}/resources/{resourceId}": {
+      "schema": "Resource",
+      "description": "Files, PDFs and videos loaded by the user"
+    },
+    "/users/{userId}/completed_resources/{completedResourceId}": {
+      "schema": "CompletedResource",
+      "description": "Finished study material indicator records"
+    }
+  }
+}

@@ -18,9 +18,13 @@ import {
   Smartphone,
   CheckCircle2,
   Lock,
-  Plus
+  Plus,
+  LogIn,
+  LogOut
 } from 'lucide-react';
 import type { SolveHistory } from '../types';
+import { useFirebase } from './FirebaseContext';
+import { updateUserProfile } from '../lib/db';
 
 interface SettingsViewProps {
   solveHistory?: SolveHistory[];
@@ -59,6 +63,7 @@ const AVATARS = [
 ];
 
 export default function SettingsView({ solveHistory = [] }: SettingsViewProps) {
+  const { user, signInWithGoogle, logout } = useFirebase();
   // Load settings from localStorage or fallback
   const [settings, setSettings] = useState<UserSettings>(() => {
     const saved = localStorage.getItem('lgs_settings');
@@ -103,6 +108,28 @@ export default function SettingsView({ solveHistory = [] }: SettingsViewProps) {
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvc, setCardCvc] = useState('');
 
+  // Handle outside database settings change sync
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const saved = localStorage.getItem('lgs_settings');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed) {
+            setSettings(parsed);
+            if (parsed.name) setProfileName(parsed.name);
+            if (parsed.targetSchool) setProfileTargetSchool(parsed.targetSchool);
+            if (parsed.dailyGoal) setProfileDailyGoal(parsed.dailyGoal);
+            if (parsed.avatarSeed) setProfileAvatar(parsed.avatarSeed);
+          }
+        } catch (e) {}
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   // Save profile settings
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,6 +146,15 @@ export default function SettingsView({ solveHistory = [] }: SettingsViewProps) {
 
     // Trigger local storage storage event for Header update
     window.dispatchEvent(new Event('storage'));
+
+    if (user) {
+      updateUserProfile(user.uid, {
+        name: profileName,
+        targetSchool: profileTargetSchool,
+        dailyGoal: profileDailyGoal,
+        avatarSeed: profileAvatar
+      }).catch(err => console.error("Firestore settings update error:", err));
+    }
   };
 
   // Save notification preferences
@@ -138,6 +174,15 @@ export default function SettingsView({ solveHistory = [] }: SettingsViewProps) {
     setSettings(updated);
     localStorage.setItem('lgs_settings', JSON.stringify(updated));
     showSuccessBanner();
+
+    if (user) {
+      updateUserProfile(user.uid, {
+        notifySms: sms,
+        notifyDaily: daily,
+        notifyAiMentorship: ai,
+        notifyTime: time
+      }).catch(err => console.error("Firestore notification preference update error:", err));
+    }
   };
 
   const showSuccessBanner = () => {
@@ -190,7 +235,8 @@ export default function SettingsView({ solveHistory = [] }: SettingsViewProps) {
 
   // Safe Data Wipe logic
   const handleWipeAllData = () => {
-    if (resetVerifyText.trim().toUpperCase() !== 'SIFIRLA') {
+    const normalized = resetVerifyText.trim().toLowerCase();
+    if (normalized !== 'sıfırla' && normalized !== 'sifirla') {
       alert('Sıfırlama işlemini onaylamak için kutucuğa SIFIRLA yazmalısınız.');
       return;
     }
@@ -217,6 +263,12 @@ export default function SettingsView({ solveHistory = [] }: SettingsViewProps) {
 
       // Trigger local storage change
       window.dispatchEvent(new Event('storage'));
+
+      if (user) {
+        updateUserProfile(user.uid, {
+          membershipType: 'Premium LGS Şampiyon'
+        }).catch(err => console.error("Firestore membership upgrade error:", err));
+      }
 
       setTimeout(() => {
         setPaymentSuccess(false);
@@ -390,6 +442,60 @@ export default function SettingsView({ solveHistory = [] }: SettingsViewProps) {
                   <h3 className="font-serif font-black underline underline-offset-4 text-lg text-primary">Profil Bilgilerini Güncelle</h3>
                 </div>
                 <p className="text-xs text-on-surface-variant">AI Mentorun sana isminle hitap edebilmesi ve hedefine uygun soru listesi planlaması için bilgilerin eksiksiz olmalıdır.</p>
+
+                {/* Firebase Google Auth Connection Card */}
+                <div className="bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 p-5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-white border border-outline rounded-xl flex items-center justify-center text-primary shadow-sm h-12 w-12 shrink-0 overflow-hidden">
+                      {user && user.photoURL ? (
+                        <img src={user.photoURL} alt="Google Avatar" className="w-8 h-8 rounded-full" referrerPolicy="no-referrer" />
+                      ) : (
+                        <LogIn size={20} className="text-primary animate-pulse" />
+                      )}
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-serif font-black text-primary italic">Bulut Veritabanı Yedeklemesi</p>
+                      {user ? (
+                        <p className="text-[11px] text-on-surface-variant leading-tight">
+                          E-posta: <span className="font-semibold text-primary">{user.email}</span> ile bağlı durumda. İlerlemeniz otomatik yedekleniyor.
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-on-surface-variant leading-tight">
+                          Hesabınızı senkronize edin! Sınav istatistikleriniz, çalışma planınız ve tüm PDF'leriniz güvenle saklanır.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {user ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm('Google bağlantısını kesmek istediğinizden emin misiniz?')) {
+                          logout();
+                        }
+                      }}
+                      className="shrink-0 flex items-center gap-1.5 px-4 py-2 bg-on-surface/5 hover:bg-on-surface/10 rounded-xl text-[11px] font-bold uppercase tracking-wider text-on-surface-variant cursor-pointer border border-outline transition-all"
+                    >
+                      <LogOut size={13} />
+                      <span>Bağlantıyı Kes</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        signInWithGoogle().then(u => {
+                          if (u) {
+                            alert(`Hoş geldin, LGS Şampiyonu ${u.displayName}! Firestore veritabanı başarıyla bağlandı.`);
+                          }
+                        });
+                      }}
+                      className="shrink-0 flex items-center gap-1.5 px-4 py-2.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-[11px] font-bold uppercase tracking-widest cursor-pointer shadow-md shadow-primary/25 hover:shadow-lg transition-all"
+                    >
+                      <LogIn size={13} />
+                      <span>Google ile Eşle</span>
+                    </button>
+                  )}
+                </div>
 
                 <form onSubmit={handleSaveProfile} className="space-y-5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

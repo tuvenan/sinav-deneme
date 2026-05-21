@@ -1,0 +1,155 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net default catch-all: deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Global Verification and Helper Functions ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Check email verification status safely
+    function isVerifiedUser(userId) {
+      return isOwner(userId) && (
+        request.auth.token.email_verified == true || 
+        request.auth.token.firebase.sign_in_provider == 'google.com'
+      );
+    }
+
+    // Path Variable Hardening (ID Poisoning Guard)
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Entity Specific Structural Validation Helpers ---
+
+    // 1. User Settings Entity Validator
+    function isValidUser(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.targetSchool is string && data.targetSchool.size() > 0 && data.targetSchool.size() <= 200 &&
+             data.dailyGoal is number && data.dailyGoal >= 10 && data.dailyGoal <= 150 &&
+             data.avatarSeed is string && data.avatarSeed.size() <= 100 &&
+             data.notifySms is bool &&
+             data.notifyDaily is bool &&
+             data.notifyAiMentorship is bool &&
+             data.notifyTime is string && data.notifyTime.size() <= 30 &&
+             data.membershipType is string && data.membershipType.size() <= 100;
+    }
+
+    // 2. Solve History Validator
+    function isValidSolveHistory(data) {
+      return data.questionId is string && data.questionId.size() > 0 && data.questionId.size() <= 100 &&
+             data.isCorrect is bool &&
+             data.selectedOption is string && data.selectedOption.size() <= 10 &&
+             data.timeSpentSeconds is number && data.timeSpentSeconds >= 0 && data.timeSpentSeconds <= 10000;
+    }
+
+    // 3. uploaded resources validator
+    function isValidResource(data) {
+      return data.id is string && data.id.size() > 0 && data.id.size() <= 100 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 256 &&
+             data.type is string && data.type.size() > 0 && data.type.size() <= 30 &&
+             data.folder is string && data.folder.size() > 0 && data.folder.size() <= 100 &&
+             data.topic is string && data.topic.size() > 0 && data.topic.size() <= 150;
+    }
+
+    // 4. Completed resources tracker validator
+    function isValidCompletedResource(data) {
+      return data.fileId is string && data.fileId.size() > 0 && data.fileId.size() <= 100;
+    }
+
+
+    // --- Collections Match Blocks ---
+
+    // Match users root level
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow create: if isVerifiedUser(userId) && 
+                      isValidId(userId) &&
+                      isValidUser(incoming()) && 
+                      incoming().keys().hasAll(['name', 'targetSchool', 'dailyGoal', 'avatarSeed', 'notifySms', 'notifyDaily', 'notifyAiMentorship', 'notifyTime', 'membershipType']) && 
+                      incoming().keys().size() == 9;
+      
+      // Updates must be partitionable into actions via affectedKeys()
+      allow update: if isVerifiedUser(userId) && 
+                      isValidId(userId) && 
+                      isValidUser(incoming()) && (
+                        // Action 1: Adjust profile demographics or daily study preferences
+                        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'targetSchool', 'dailyGoal', 'avatarSeed', 'notifySms', 'notifyDaily', 'notifyAiMentorship', 'notifyTime']) ||
+                        // Action 2: Premium level up
+                        incoming().diff(existing()).affectedKeys().hasOnly(['membershipType'])
+                      );
+                      
+      allow delete: if isVerifiedUser(userId) && isValidId(userId);
+
+      // Solve History Subcollection
+      match /solve_history/{historyId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(historyId);
+        allow create: if isVerifiedUser(userId) && 
+                        isValidId(historyId) && 
+                        isValidSolveHistory(incoming()) && 
+                        incoming().solvedAt == request.time && 
+                        incoming().keys().hasAll(['questionId', 'isCorrect', 'selectedOption', 'timeSpentSeconds', 'solvedAt']) && 
+                        incoming().keys().size() == 5;
+        // Historical log states are immutable after creation
+        allow update: if false; 
+        allow delete: if isVerifiedUser(userId) && isValidId(historyId);
+      }
+
+      // Resources Subcollection
+      match /resources/{resourceId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(resourceId);
+        allow create: if isVerifiedUser(userId) && 
+                        isValidId(resourceId) && 
+                        isValidResource(incoming()) && 
+                        incoming().createdAt == request.time &&
+                        incoming().keys().hasAll(['id', 'name', 'type', 'folder', 'topic', 'createdAt']) && 
+                        incoming().keys().size() == 6;
+        
+        allow update: if isVerifiedUser(userId) && 
+                        isValidId(resourceId) && 
+                        isValidResource(incoming()) && 
+                        incoming().id == existing().id &&
+                        incoming().createdAt == existing().createdAt && (
+                          // Action: update fields like folder or category
+                          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'folder', 'topic'])
+                        );
+                        
+        allow delete: if isVerifiedUser(userId) && isValidId(resourceId);
+      }
+
+      // Completed Resources tracker subcollection
+      match /completed_resources/{completedResourceId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(completedResourceId);
+        allow create: if isVerifiedUser(userId) && 
+                        isValidId(completedResourceId) && 
+                        isValidCompletedResource(incoming()) && 
+                        incoming().completedAt == request.time &&
+                        incoming().keys().hasAll(['fileId', 'completedAt']) && 
+                        incoming().keys().size() == 2;
+                        
+        allow update: if false; // Once a resource is marked completed, it remains marked or is simply deleted to revoke.
+        allow delete: if isVerifiedUser(userId) && isValidId(completedResourceId);
+      }
+    }
+  }
+}

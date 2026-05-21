@@ -20,6 +20,15 @@ import {
   Video,
   UploadCloud
 } from 'lucide-react';
+import { useFirebase } from './FirebaseContext';
+import { 
+  getCustomResources, 
+  getCompletedResources, 
+  addCustomResource, 
+  deleteCustomResource, 
+  markResourceCompleted, 
+  unmarkResourceCompleted 
+} from '../lib/db';
 
 interface ResourceFile {
   id: string;
@@ -287,6 +296,7 @@ interface ResourcesViewProps {
 }
 
 export default function ResourcesView({ uploadTrigger = 0 }: ResourcesViewProps = {}) {
+  const { user } = useFirebase();
   const [files, setFiles] = useState<ResourceFile[]>(() => {
     const saved = localStorage.getItem('lgs_resources');
     if (saved) {
@@ -317,11 +327,52 @@ export default function ResourcesView({ uploadTrigger = 0 }: ResourcesViewProps 
     localStorage.setItem('lgs_completed_resources', JSON.stringify(completedFileIds));
   }, [completedFileIds]);
 
+  // Load resources and completions from Firebase if available
+  useEffect(() => {
+    if (!user) return;
+
+    const syncResources = async () => {
+      try {
+        const fbFiles = await getCustomResources(user.uid);
+        if (fbFiles && fbFiles.length > 0) {
+          const customIds = new Set(fbFiles.map(f => f.id));
+          const baseFiles = DEFAULT_FILES.filter(f => !customIds.has(f.id));
+          setFiles([...fbFiles, ...baseFiles]);
+        }
+
+        const fbCompleted = await getCompletedResources(user.uid);
+        if (fbCompleted && fbCompleted.length > 0) {
+          setCompletedFileIds(fbCompleted);
+        }
+      } catch (err) {
+        console.error("Firestore resources loading error:", err);
+      }
+    };
+
+    syncResources();
+  }, [user]);
+
   useEffect(() => {
     if (uploadTrigger > 0) {
       setIsUploadOpen(true);
     }
   }, [uploadTrigger]);
+
+  useEffect(() => {
+    const handleGlobalSelectResource = (e: Event) => {
+      const customEvent = e as CustomEvent<{ fileId: string }>;
+      if (customEvent?.detail?.fileId) {
+        const found = files.find(f => f.id === customEvent.detail.fileId);
+        if (found) {
+          handleOpenFile(found);
+        }
+      }
+    };
+    window.addEventListener('select_resource', handleGlobalSelectResource);
+    return () => {
+      window.removeEventListener('select_resource', handleGlobalSelectResource);
+    };
+  }, [files]);
 
   // Filters State
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
@@ -388,9 +439,10 @@ export default function ResourcesView({ uploadTrigger = 0 }: ResourcesViewProps 
     if (deducedType === 'video') {
       setFormFolder('Video Çözümler');
     } else {
-      if (file.name.toLowerCase().includes('çıkmış') || file.name.toLowerCase().includes('cikmis') || file.name.toLowerCase().includes('lgs')) {
+      const nameLower = file.name.toLocaleLowerCase('tr-TR');
+      if (nameLower.includes('çıkmış') || nameLower.includes('cikmis') || nameLower.includes('lgs')) {
         setFormFolder('Çıkmış Sorular');
-      } else if (file.name.toLowerCase().includes('deneme')) {
+      } else if (nameLower.includes('deneme')) {
         setFormFolder('Deneme Sınavları');
       } else {
         setFormFolder('Ders Notları');
@@ -422,8 +474,9 @@ export default function ResourcesView({ uploadTrigger = 0 }: ResourcesViewProps 
       { key: 'ucgen', val: 'Üçgenler' }
     ];
     let matchedTopic = "Matematik LGS Kazanımları";
+    const nameLower = file.name.toLocaleLowerCase('tr-TR');
     for (const kw of topicKeywords) {
-      if (file.name.toLowerCase().includes(kw.key)) {
+      if (nameLower.includes(kw.key)) {
         matchedTopic = kw.val;
         break;
       }
@@ -532,15 +585,17 @@ export default function ResourcesView({ uploadTrigger = 0 }: ResourcesViewProps 
   const filteredFiles = useMemo(() => {
     return files.filter(file => {
       const matchesFolder = selectedFolder ? file.folder === selectedFolder : true;
-      const matchesSearch = file.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            file.topic.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            file.content.toLowerCase().includes(searchQuery.toLowerCase());
+      const queryLower = searchQuery.toLocaleLowerCase('tr-TR');
+      const matchesSearch = file.name.toLocaleLowerCase('tr-TR').includes(queryLower) || 
+                            file.topic.toLocaleLowerCase('tr-TR').includes(queryLower) || 
+                            file.content.toLocaleLowerCase('tr-TR').includes(queryLower);
       const matchesType = filterType === 'all' ? true : file.type === filterType;
       return matchesFolder && matchesSearch && matchesType;
     });
   }, [files, selectedFolder, searchQuery, filterType]);
 
   const handleToggleComplete = (id: string) => {
+    const isCompleted = completedFileIds.includes(id);
     setCompletedFileIds(prev => {
       if (prev.includes(id)) {
         return prev.filter(item => item !== id);
@@ -548,6 +603,14 @@ export default function ResourcesView({ uploadTrigger = 0 }: ResourcesViewProps 
         return [...prev, id];
       }
     });
+
+    if (user) {
+      if (isCompleted) {
+        unmarkResourceCompleted(user.uid, id).catch(e => console.error("Error unmarking resource completion in Firestore:", e));
+      } else {
+        markResourceCompleted(user.uid, id).catch(e => console.error("Error marking resource completion in Firestore:", e));
+      }
+    }
   };
 
   const handleOpenFile = (file: ResourceFile) => {
@@ -588,6 +651,10 @@ export default function ResourcesView({ uploadTrigger = 0 }: ResourcesViewProps 
     setFiles(prev => [newResource, ...prev]);
     setIsUploadOpen(false);
 
+    if (user) {
+      addCustomResource(user.uid, newResource).catch(e => console.error("Error writing resource metadata to Firestore:", e));
+    }
+
     // Reset Form fields
     setFormName('');
     setFormFolder('Ders Notları');
@@ -607,6 +674,11 @@ export default function ResourcesView({ uploadTrigger = 0 }: ResourcesViewProps 
       setCompletedFileIds(prev => prev.filter(item => item !== id));
       if (activeFile && activeFile.id === id) {
         setActiveFile(null);
+      }
+
+      if (user) {
+        deleteCustomResource(user.uid, id).catch(e => console.error("Error deleting resource metadata from Firestore:", e));
+        unmarkResourceCompleted(user.uid, id).catch(e => console.error("Error deleting completion record from Firestore:", e));
       }
     }
   };

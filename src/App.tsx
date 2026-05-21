@@ -13,6 +13,9 @@ import ResourcesView from './components/ResourcesView';
 import SettingsView from './components/SettingsView';
 import AIGuideView from './components/AIGuideView';
 import type { Question, Message, Difficulty, SolveHistory } from './types';
+import { useFirebase } from './components/FirebaseContext';
+import { getOrCreateUserProfile, getSolveHistories, addSolveHistory } from './lib/db';
+import { Sparkles, ShieldCheck, CloudLightning, BookOpen } from 'lucide-react';
 
 const INITIAL_QUESTIONS: Question[] = [
   {
@@ -66,6 +69,15 @@ const INITIAL_QUESTIONS: Question[] = [
 ];
 
 export default function App() {
+  const { user, loading: authLoading, signInWithGoogle } = useFirebase();
+  const [showRegisterPromo, setShowRegisterPromo] = useState(() => {
+    try {
+      const dismissed = sessionStorage.getItem('lgs_dismiss_register_promo');
+      return !dismissed;
+    } catch (e) {
+      return true;
+    }
+  });
   const [activeTab, setActiveTab] = useState('calisma');
   const [questions, setQuestions] = useState<Question[]>(INITIAL_QUESTIONS);
   const [currentQuestion, setCurrentQuestion] = useState<Question>(INITIAL_QUESTIONS[0]);
@@ -99,6 +111,46 @@ export default function App() {
     localStorage.setItem('lgs_solve_history', JSON.stringify(solveHistory));
   }, [solveHistory]);
 
+  // Load from Firebase when authenticated, and sync
+  useEffect(() => {
+    if (!user) return;
+
+    const syncUserData = async () => {
+      try {
+        const localSettingsRaw = localStorage.getItem('lgs_settings');
+        const defaultSettings = localSettingsRaw ? JSON.parse(localSettingsRaw) : {
+          name: user.displayName || 'Deniz Yılmaz',
+          targetSchool: 'Kabataş Erkek Lisesi',
+          dailyGoal: 50,
+          avatarSeed: 'Felix',
+          notifySms: true,
+          notifyDaily: true,
+          notifyAiMentorship: true,
+          notifyTime: '18:30',
+          membershipType: 'Standart'
+        };
+        const fbSettings = await getOrCreateUserProfile(user.uid, defaultSettings);
+        localStorage.setItem('lgs_settings', JSON.stringify(fbSettings));
+        window.dispatchEvent(new Event('storage'));
+
+        // Load solve history
+        const fbHistory = await getSolveHistories(user.uid);
+        if (fbHistory && fbHistory.length > 0) {
+          setSolveHistory(fbHistory);
+        } else {
+          // Sync current local solve history to Firebase
+          for (const item of solveHistory) {
+            await addSolveHistory(user.uid, item);
+          }
+        }
+      } catch (err) {
+        console.error("Firestore user sync error:", err);
+      }
+    };
+
+    syncUserData();
+  }, [user]);
+
   const loadNewQuestion = useCallback(() => {
     setCurrentQuestion(prev => {
       let pool = questions;
@@ -130,6 +182,12 @@ export default function App() {
       difficulty: currentQuestion.difficulty
     };
     setSolveHistory(prev => [...prev, newSolve]);
+
+    if (user) {
+      addSolveHistory(user.uid, newSolve).catch(e => {
+        console.error("Firestore solve history write error:", e);
+      });
+    }
 
     const formattedTime = timeSpentSeconds > 59 
       ? `${Math.floor(timeSpentSeconds / 60)} dk ${timeSpentSeconds % 60} sn` 
@@ -210,6 +268,43 @@ export default function App() {
   };
 
   useEffect(() => {
+    const handleGlobalSelectQuestion = (e: Event) => {
+      const customEvent = e as CustomEvent<{ questionId: string }>;
+      if (customEvent?.detail?.questionId) {
+        const found = questions.find(q => q.id === customEvent.detail.questionId);
+        if (found) {
+          setCurrentQuestion(found);
+          setActiveTab('calisma');
+        }
+      }
+    };
+
+    const handleGlobalSelectResource = (e: Event) => {
+      const customEvent = e as CustomEvent<{ fileId: string }>;
+      if (customEvent?.detail?.fileId) {
+        setActiveTab('kaynaklar');
+      }
+    };
+
+    const handleGlobalAskAiMentor = (e: Event) => {
+      const customEvent = e as CustomEvent<{ prompt: string }>;
+      if (customEvent?.detail?.prompt) {
+        handleSendMessage(customEvent.detail.prompt);
+      }
+    };
+
+    window.addEventListener('select_question', handleGlobalSelectQuestion);
+    window.addEventListener('select_resource', handleGlobalSelectResource);
+    window.addEventListener('ask_ai_mentor', handleGlobalAskAiMentor);
+
+    return () => {
+      window.removeEventListener('select_question', handleGlobalSelectQuestion);
+      window.removeEventListener('select_resource', handleGlobalSelectResource);
+      window.removeEventListener('ask_ai_mentor', handleGlobalAskAiMentor);
+    };
+  }, [questions]);
+
+  useEffect(() => {
     loadNewQuestion();
   }, [difficulty, loadNewQuestion]);
 
@@ -242,6 +337,127 @@ export default function App() {
           errorAnalysis={lastErrorAnalysis}
         />
       </div>
+
+      {/* Modern, High-Conversion Google Sign-Up & Onboarding Modal */}
+      {!user && showRegisterPromo && (
+        <div className="fixed inset-0 bg-black/65 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in animate-duration-300">
+          <div className="bg-white rounded-3xl border border-outline w-full max-w-lg overflow-hidden shadow-2xl flex flex-col relative animate-scale-up duration-300 transform">
+            
+            {/* Elegant Header Accent */}
+            <div className="h-2.5 bg-gradient-to-r from-primary via-primary-hover to-purple-600 w-full" />
+            
+            {/* Close button */}
+            <button 
+              onClick={() => {
+                sessionStorage.setItem('lgs_dismiss_register_promo', 'true');
+                setShowRegisterPromo(false);
+              }}
+              className="absolute top-5 right-5 p-2 rounded-full hover:bg-neutral-100 text-neutral-400 hover:text-neutral-700 transition-colors cursor-pointer"
+              title="Misafir Olarak Devam Et"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            {/* Content area */}
+            <div className="p-8 pb-6 flex-1 flex flex-col text-center">
+              
+              {/* Star Badge */}
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary rounded-full text-[10px] font-black uppercase tracking-wider mx-auto mb-4 border border-primary/15 animate-bounce">
+                <Sparkles size={11} className="text-primary" />
+                <span>Yapay Zekalı LGS Sınıfı</span>
+              </div>
+
+              {/* Title */}
+              <h2 className="text-2xl font-serif font-black text-primary tracking-tight mb-2">
+                LGS Mentor AI ile Dereceye Hazırlan! 🚀
+              </h2>
+              <p className="text-xs text-on-surface-variant max-w-sm mx-auto mb-6 leading-relaxed">
+                Platformumuzun tüm kişiselleştirilmiş analizlerini ve çalışma kütüphanesini bulut güvencesi ile kullanın.
+              </p>
+
+              {/* Value Propositions */}
+              <div className="space-y-4 text-left mb-8 max-w-sm mx-auto">
+                {/* Prop 1 */}
+                <div className="flex gap-3.5 items-start">
+                  <div className="mt-0.5 p-1.5 bg-emerald-50 text-emerald-600 rounded-lg shrink-0 border border-emerald-100">
+                    <ShieldCheck size={16} />
+                  </div>
+                  <div className="space-y-0.5">
+                    <h3 className="text-xs font-bold text-primary">Bulut Yedeklemesi & Senkronizasyon</h3>
+                    <p className="text-[11px] text-on-surface-variant leading-tight">
+                      Çözdüğün tüm üslü sayı soruları, yanlış analizleri ve kazanılan rozetler asla silinmez.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Prop 2 */}
+                <div className="flex gap-3.5 items-start">
+                  <div className="mt-0.5 p-1.5 bg-blue-50 text-blue-600 rounded-lg shrink-0 border border-blue-100">
+                    <CloudLightning size={16} />
+                  </div>
+                  <div className="space-y-0.5">
+                    <h3 className="text-xs font-bold text-primary">Kişiselleştirilmiş PDF Kütüphanesi</h3>
+                    <p className="text-[11px] text-on-surface-variant leading-tight">
+                      Kendi yüklediğin LGS ders notları ve soru PDF'leri her cihazdan anında erişilebilir olur.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Prop 3 */}
+                <div className="flex gap-3.5 items-start">
+                  <div className="mt-0.5 p-1.5 bg-purple-50 text-purple-600 rounded-lg shrink-0 border border-purple-100">
+                    <BookOpen size={16} />
+                  </div>
+                  <div className="space-y-0.5">
+                    <h3 className="text-xs font-bold text-primary">Detaylı Gelişim Grafikleri</h3>
+                    <p className="text-[11px] text-on-surface-variant leading-tight">
+                      Yapay zeka asistanı, hedefindeki Kabataş Erkek Lisesi gibi okullara kalan puan mesafeni hedefler.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main CTA: Google Authentication Button */}
+              <button
+                onClick={() => {
+                  signInWithGoogle().then(u => {
+                    if (u) {
+                      setShowRegisterPromo(false);
+                      alert(`Tebrikler ${u.displayName}! Google ile kaydın başarıyla aktive edildi. Tüm ilerlemen kaydediliyor.`);
+                    }
+                  });
+                }}
+                className="w-full flex items-center justify-center gap-3 px-6 py-3.5 bg-primary hover:bg-primary-hover text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-primary/20 hover:shadow-xl cursor-pointer hover:-translate-y-0.5 active:translate-y-0"
+              >
+                {/* Clean inline SVG G-logo */}
+                <svg className="w-4 h-4 text-white shrink-0 fill-current" viewBox="0 0 24 24">
+                  <path d="M12.24 10.285V14.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.866-3.577-7.866-8s3.536-8 7.866-8c2.46 0 4.105 1.025 5.047 1.926l3.227-3.102C18.22 1.43 15.44 0 12.24 0 5.58 0 0 5.37 0 12s5.58 12 12.24 12c6.96 0 11.57-4.89 11.57-11.79 0-.795-.085-1.405-.18-1.925H12.24z"/>
+                </svg>
+                <span>Google ile Kayıt Ol / Giriş Yap</span>
+              </button>
+
+            </div>
+
+            {/* Optional humble footer */}
+            <div className="px-8 py-4 bg-neutral-50 border-t border-outline flex items-center justify-between text-[10px] text-on-surface-variant/80">
+              <span className="font-medium">Hesap açmak tamamen ücretsizdir.</span>
+              <button
+                onClick={() => {
+                  sessionStorage.setItem('lgs_dismiss_register_promo', 'true');
+                  setShowRegisterPromo(false);
+                }}
+                className="font-bold text-primary hover:underline cursor-pointer"
+              >
+                Misafir Olarak Devam Et &rarr;
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
