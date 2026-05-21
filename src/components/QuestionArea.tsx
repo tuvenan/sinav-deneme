@@ -2,6 +2,7 @@ import { CheckCircle, Clock, Lightbulb, RefreshCw, Star, TrendingUp, XCircle } f
 import { motion, AnimatePresence } from 'motion/react';
 import { useState, useEffect } from 'react';
 import type { Question, Difficulty } from '../types';
+import GoogleCalendarWidget from './GoogleCalendarWidget';
 
 interface QuestionAreaProps {
   question: Question;
@@ -220,6 +221,9 @@ export default function QuestionArea({
             </button>
           </div>
         </div>
+
+        {/* Beautiful Google Calendar Planner Widget */}
+        <GoogleCalendarWidget />
       </div>
     </section>
   );

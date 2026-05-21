@@ -25,6 +25,8 @@ import {
 import type { SolveHistory } from '../types';
 import { useFirebase } from './FirebaseContext';
 import { updateUserProfile } from '../lib/db';
+import { setDailyStudyReminder } from '../lib/googleCalendar';
+import { Calendar as CalendarIcon } from 'lucide-react';
 
 interface SettingsViewProps {
   solveHistory?: SolveHistory[];
@@ -63,7 +65,45 @@ const AVATARS = [
 ];
 
 export default function SettingsView({ solveHistory = [] }: SettingsViewProps) {
-  const { user, signInWithGoogle, logout } = useFirebase();
+  const { user, signInWithGoogle, logout, accessToken, connectCalendar } = useFirebase();
+  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
+
+  const handleConnectCalendar = async () => {
+    setIsSyncingCalendar(true);
+    try {
+      const token = await connectCalendar();
+      if (token) {
+        alert('Google Takvim başarıyla bağlandı!');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Google Takvim bağlantısı başarısız oldu.');
+    } finally {
+      setIsSyncingCalendar(false);
+    }
+  };
+
+  const handleSetDailyStudyReminder = async () => {
+    if (!accessToken) {
+      alert('Lütfen önce Google Takviminizi bağlayın.');
+      return;
+    }
+    const confirmed = window.confirm(
+      `Her gün saat ${settings.notifyTime}'de Google Takviminize tekrarlayan bir "LGS Çalışma Saati" etkinliği eklemek istiyor musunuz?`
+    );
+    if (!confirmed) return;
+
+    setIsSyncingCalendar(true);
+    try {
+      await setDailyStudyReminder(accessToken, settings.notifyTime, settings.dailyGoal);
+      alert('Harika! Günlük LGS Çalışma Hatırlatıcısı Google Takviminize eklendi. Artık her gün tanımlanan saatte bildirim alacaksınız!');
+    } catch (err) {
+      console.error(err);
+      alert('Takvim hatırlatıcısı oluşturulurken bir hata oluştu.');
+    } finally {
+      setIsSyncingCalendar(false);
+    }
+  };
   // Load settings from localStorage or fallback
   const [settings, setSettings] = useState<UserSettings>(() => {
     const saved = localStorage.getItem('lgs_settings');
@@ -78,8 +118,92 @@ export default function SettingsView({ solveHistory = [] }: SettingsViewProps) {
   });
 
   // Current sub-section selected
-  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'security' | 'billing'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'notifications_history' | 'security' | 'billing'>('profile');
   
+  // Notification history item definition
+  interface NotificationItem {
+    id: string;
+    title: string;
+    content: string;
+    timestamp: string;
+    type: 'mentorship' | 'target' | 'warning' | 'tip';
+    read: boolean;
+  }
+
+  // Persistent notification history state
+  const [notificationsHistory, setNotificationsHistory] = useState<NotificationItem[]>(() => {
+    const saved = localStorage.getItem('lgs_notifications_history');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    const defaults: NotificationItem[] = [
+      {
+        id: '1',
+        title: 'Hedef Güncellemesi',
+        content: 'Kabataş Erkek Lisesi kazanma ihtimalin bu hafta %2.4 arttı! Deneme performansındaki artış trendi devam ediyor.',
+        timestamp: '10 dakika önce',
+        type: 'target',
+        read: false
+      },
+      {
+        id: '2',
+        title: 'Önemli Hatırlatma',
+        content: "LGS Mentor AI: 'Bugün henüz günlük hedefine ulaşamadın. Üslü sayılardan 10 soru çözerek başlamaya ne dersin?'",
+        timestamp: '2 saat önce',
+        type: 'warning',
+        read: false
+      },
+      {
+        id: '3',
+        title: 'AI Mentor Önerisi',
+        content: 'Son denemendeki felsefe/türkçe sorularından ötürü okuma hızını artırmak için paragraf kaynaklarına göz atmalısın.',
+        timestamp: '1 gün önce',
+        type: 'tip',
+        read: true
+      },
+      {
+        id: '4',
+        title: 'Süreç Raporu',
+        content: 'Haftalık çalışma turların başarıyla tamamlandı! PDF/Kaynaklar sayfasından yeni gelişim raporunu bilgisayarına indirebilirsin.',
+        timestamp: '2 gün önce',
+        type: 'mentorship',
+        read: true
+      },
+      {
+        id: '5',
+        title: 'Haftalık Akıllı Analiz',
+        content: 'Matematik alt konularından Çarpanlar ve Katlar konusunu %85 doğruluk oranı ile tamamladın, tebrikler!',
+        timestamp: '3 gün önce',
+        type: 'mentorship',
+        read: true
+      }
+    ];
+    
+    localStorage.setItem('lgs_notifications_history', JSON.stringify(defaults));
+    return defaults;
+  });
+
+  const markAllAsRead = () => {
+    const updated = notificationsHistory.map(n => ({ ...n, read: true }));
+    setNotificationsHistory(updated);
+    localStorage.setItem('lgs_notifications_history', JSON.stringify(updated));
+  };
+
+  const deleteNotification = (id: string) => {
+    const updated = notificationsHistory.filter(n => n.id !== id);
+    setNotificationsHistory(updated);
+    localStorage.setItem('lgs_notifications_history', JSON.stringify(updated));
+  };
+
+  const clearNotificationHistory = () => {
+    if (confirm('Tüm bildirim geçmişini silmek istediğinizden emin misiniz?')) {
+      setNotificationsHistory([]);
+      localStorage.setItem('lgs_notifications_history', JSON.stringify([]));
+    }
+  };
+
   // Save/Notification messages state
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [testNotificationMsg, setTestNotificationMsg] = useState<string | null>(null);
@@ -195,16 +319,31 @@ export default function SettingsView({ solveHistory = [] }: SettingsViewProps) {
   // Trigger Mock Browser Notification Banner inside the UI
   const triggerTestNotificationMsg = () => {
     const messages = [
-      "🔔 LGS Mentor AI: 'Bugün henüz hedefine ulaşamadın. Üslü sayılardan 10 soru çözerek başlamaya ne dersin?'",
-      "🎯 Hedef Güncellemesi: Kabataş Erkek Lisesi kazanma ihtimalin bu hafta %2.4 arttı!",
-      "💡 AI Mentor Önerisi: Son denemendeki felsefe/türkçe sorularından ötürü okuma hızını artırmak için paragraf kaynaklarına göz atmalısın.",
-      "🚀 Süreç Raporu: Haftalık çalışma turların tamamlandı! PDF/Kaynaklar sayfasından yeni raporunu inceleyebilirsin."
+      { title: 'LGS Mentor AI', content: "Bugün henüz hedefine ulaşamadın. Üslü sayılardan 10 soru çözerek başlamaya ne dersin?", type: 'warning' as const },
+      { title: 'Hedef Güncellemesi', content: "Kabataş Erkek Lisesi kazanma ihtimalin bu hafta %2.4 arttı!", type: 'target' as const },
+      { title: 'AI Mentor Önerisi', content: "Son denemendeki felsefe/türkçe sorularından ötürü okuma hızını artırmak için paragraf kaynaklarına göz atmalısın.", type: 'tip' as const },
+      { title: 'Süreç Raporu', content: "Haftalık çalışma turların tamamlandı! PDF/Kaynaklar sayfasından yeni raporunu inceleyebilirsin.", type: 'mentorship' as const }
     ];
-    const randomMsg = messages[Math.floor(Math.random() * messages.length)];
-    setTestNotificationMsg(randomMsg);
+    const item = messages[Math.floor(Math.random() * messages.length)];
+    setTestNotificationMsg(`🔔 ${item.title}: '${item.content}'`);
     setTimeout(() => {
       setTestNotificationMsg(null);
     }, 5000);
+
+    const newNotif: NotificationItem = {
+      id: Date.now().toString(),
+      title: item.title,
+      content: item.content,
+      timestamp: 'Şimdi',
+      type: item.type,
+      read: false
+    };
+
+    setNotificationsHistory(prev => {
+      const updated = [newNotif, ...prev];
+      localStorage.setItem('lgs_notifications_history', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   // Password Update Simulated Flow
@@ -383,6 +522,18 @@ export default function SettingsView({ solveHistory = [] }: SettingsViewProps) {
             >
               <Bell size={16} />
               <span>Bildirimler</span>
+            </button>
+
+            <button 
+              onClick={() => setActiveTab('notifications_history')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                activeTab === 'notifications_history' 
+                  ? 'bg-primary text-white shadow-md' 
+                  : 'text-on-surface-variant hover:bg-surface-dim hover:text-primary'
+              }`}
+            >
+              <Clock size={16} />
+              <span>Bildirim Geçmişi</span>
             </button>
 
             <button 
@@ -676,6 +827,50 @@ export default function SettingsView({ solveHistory = [] }: SettingsViewProps) {
                       className="px-3 py-1.5 font-bold font-mono text-xs border border-outline rounded-xl bg-surface focus:outline-none focus:ring-1 focus:ring-primary w-full sm:w-32"
                     />
                   </div>
+
+                  {/* Google Calendar Integration Settings Box */}
+                  <div className="p-4 border border-outline/75 bg-primary/5 rounded-xl space-y-4">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-primary/10 rounded-lg text-primary shrink-0">
+                        <CalendarIcon size={18} />
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="font-bold text-xs text-primary uppercase tracking-tight block">Google Takvim Entegrasyonu</p>
+                        <p className="text-[10px] text-on-surface-variant leading-relaxed">
+                          Yapay Zeka Mentorun belirlediği günlük soru hedeflerini ve çalışma saatlerini Google Takvim'ine anlık bildirim olarak ekle.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2 border-t border-outline/30 items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2.5 h-2.5 rounded-full ${accessToken ? 'bg-emerald-500' : 'bg-amber-500'} animate-pulse`} />
+                        <span className="text-[11px] font-bold text-on-surface font-mono">
+                          {accessToken ? 'Durum: Google Hesabı Bağlı' : 'Durum: Bağlantı Yok'}
+                        </span>
+                      </div>
+
+                      <div className="flex gap-2 w-full sm:w-auto shrink-0 justify-end">
+                        {!accessToken ? (
+                          <button
+                            type="button"
+                            onClick={handleConnectCalendar}
+                            className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-white text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer w-full sm:w-auto text-center"
+                          >
+                            Hesabı Bağla
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleSetDailyStudyReminder}
+                            className="px-4 py-2 bg-primary hover:bg-primary-hover text-white text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all cursor-pointer w-full sm:w-auto text-center"
+                          >
+                            Takvime Hatırlatıcı Ekle
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Simulated testing button inside the tab to let them see it */}
@@ -818,6 +1013,125 @@ export default function SettingsView({ solveHistory = [] }: SettingsViewProps) {
                   )}
                 </div>
 
+              </div>
+            </div>
+          )}
+
+          {/* 5. NOTIFICATION HISTORY SECTION IMPLEMENTATION */}
+          {activeTab === 'notifications_history' && (
+            <div className="space-y-6 flex-1 flex flex-col justify-between">
+              <div className="space-y-6">
+                <div className="flex items-center justify-between pb-2 border-b border-outline">
+                  <div className="flex items-center gap-2">
+                    <Bell size={20} className="text-primary" />
+                    <h3 className="font-serif font-black text-lg text-primary">Bildirim Geçmişi</h3>
+                  </div>
+                  {notificationsHistory.length > 0 && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={markAllAsRead}
+                        className="px-3 py-1 bg-surface-dim hover:text-primary transition-all text-[10px] font-bold uppercase tracking-wider rounded border border-outline cursor-pointer"
+                      >
+                        Tümünü Okundu Say
+                      </button>
+                      <button
+                        onClick={clearNotificationHistory}
+                        className="px-3 py-1 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-all text-[10px] font-bold uppercase tracking-wider rounded border border-rose-100 cursor-pointer"
+                      >
+                        Temizle
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  Yapay Zeka Mentorun tarafından sana gönderilmiş olan tüm önemli tavsiyeleri, sınav hatırlatmalarını ve motivasyon fısıltılarını buradan takip edebilirsin. Kaçırdığın hiçbir tavsiye geride kalmasın!
+                </p>
+
+                {notificationsHistory.length === 0 ? (
+                  <div className="py-12 text-center border-2 border-dashed border-outline rounded-2xl bg-surface-dim/30 space-y-3">
+                    <div className="w-12 h-12 bg-outline-variant/30 text-on-surface-variant/60 rounded-full flex items-center justify-center mx-auto">
+                      <Bell size={20} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-primary">Gelen Kutun Bomboş</h4>
+                      <p className="text-[10px] text-on-surface-variant max-w-xs mx-auto leading-relaxed mt-1">Henüz kaçırdığın veya okunmamış bir yapay zeka mental bildirimin bulunmuyor.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3.5 max-h-[500px] overflow-y-auto pr-2 scrollbar-thin">
+                    {notificationsHistory.map((notif) => {
+                      // Icon selection
+                      const getIcon = (type: string) => {
+                        switch (type) {
+                          case 'target':
+                            return <Trophy size={14} className="text-indigo-600" />;
+                          case 'warning':
+                            return <AlertTriangle size={14} className="text-rose-600" />;
+                          case 'tip':
+                            return <Sparkles size={14} className="text-amber-600" />;
+                          default:
+                            return <Mail size={14} className="text-primary" />;
+                        }
+                      };
+
+                      const getColorClasses = (type: string, read: boolean) => {
+                        if (!read) {
+                          switch (type) {
+                            case 'target':
+                              return 'bg-indigo-50 border-indigo-200/80';
+                            case 'warning':
+                              return 'bg-rose-50 border-rose-200/80';
+                            case 'tip':
+                              return 'bg-amber-50/75 border-amber-200/75';
+                            default:
+                              return 'bg-primary/5 border-primary/20';
+                          }
+                        }
+                        return 'bg-white border-outline hover:border-primary/40';
+                      };
+
+                      return (
+                        <div
+                          key={notif.id}
+                          className={`p-4 border rounded-xl flex items-start justify-between gap-4 transition-all ${getColorClasses(notif.type, notif.read)}`}
+                        >
+                          <div className="flex items-start gap-3 min-w-0">
+                            <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${
+                              notif.read ? 'bg-surface-dim text-on-surface-variant' : 'bg-white shadow-sm'
+                            }`}>
+                              {getIcon(notif.type)}
+                            </div>
+                            <div className="space-y-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className={`text-xs font-serif font-black ${notif.read ? 'text-on-surface-variant' : 'text-primary'}`}>
+                                  {notif.title}
+                                </h4>
+                                {!notif.read && (
+                                  <span className="text-[8px] font-bold text-white bg-primary px-1.5 py-0.5 rounded-full uppercase tracking-wider block">Yeni</span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-on-surface leading-relaxed font-medium">
+                                {notif.content}
+                              </p>
+                              <p className="text-[10px] text-on-surface-variant/60 font-mono font-bold pt-0.5">
+                                {notif.timestamp}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <button
+                            onClick={() => deleteNotification(notif.id)}
+                            className="text-on-surface-variant/40 hover:text-rose-600 transition-colors cursor-pointer text-xs font-black p-1 block leading-none"
+                            title="Sil"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           )}

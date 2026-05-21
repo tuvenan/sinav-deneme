@@ -248,16 +248,82 @@ export default function App() {
     };
     setMessages(prev => [...prev, userMsg]);
 
+    // Check if this is a speech-to-text concept explanation response
+    const isVoiceAnalysis = text.includes('[Zor Kavram Açıklama Analizi]');
+    const lowerText = text.toLowerCase();
+
     // Simulated AI response
     setTimeout(() => {
+      let responseText = 'Güzel bir soru! Bu adımda tabanların aynı olduğuna dikkat etmelisin. Eğer tabanlar aynıysa üsleri toplaman yeterli olacaktır.';
+
+      if (isVoiceAnalysis) {
+        if (lowerText.includes('üs') && lowerText.includes('çarpma') && (lowerText.includes('çarp') || lowerText.includes('on beş') || lowerText.includes('onbeş'))) {
+          responseText = `🎙️ **Ses Kaydı Analizi Yapıldı (Kural Hatası Tespit Edildi!)**
+
+Merhaba! Harika bir çaba, kavramları kendi sesinle açıklaman kalıcı öğrenmenin 1 numaralı sırrıdır! Ancak açıklamanda LGS denemelerinde çok can yakan bir kaza tespit ettim:
+
+❌ **Yanılgı:** "Tabanlar aynıyken üsleri kendi arasında çarparız" dedin ve ve $2^3 \\cdot 2^5 = 2^{15}$ örneğini verdin.
+
+✅ **Gerçek Kural:** Üslü sayılarda çarpma işleminde tabanlar aynı ise **üsler toplanır!** Yani çarpma işleminde üsleri çarpmayız, toplarız:
+$$2^3 \\cdot 2^5 = 2^{(3+5)} = 2^8$$
+
+**Mentor Önerisi:** Üsler ancak "üssün üssü" alınırken çarpılır (Örn: $(2^3)^5 = 2^{15}$). Çarpma kuralı ile Üssün Üssü kuralını birbiriyle karıştırmamak için bu akşam soru defterine 3 adet çarpma örneği yazıp çözmeni öneririm!`;
+        } else if (lowerText.includes('kök') && lowerText.includes('toplama') && (lowerText.includes('kök iç') || lowerText.includes('sekiz') || lowerText.includes('kök sekiz'))) {
+          responseText = `🎙️ **Ses Kaydı Analizi Yapıldı (Temel Bilgi Hatası Tespit Edildi!)**
+
+Ses kaydıyla kavram anlatımı yapman harika bir çalışma! Ancak LGS Matematik sınavlarında öğrencilerin %80'inin düştüğü klasik bir köklü sayı tuzağına düştün:
+
+❌ **Yanılgı:** "Köklü sayılarda toplama yaparken kök içlerindeki sayıları toplayabiliriz" dedin ve $\\sqrt{3} + \\sqrt{5} = \\sqrt{8}$ dedin.
+
+✅ **Gerçek Kural:** Köklü sayılarda toplama veya çıkarma yapabilmek için **kök içlerinin kesinlikle aynı olması gerekir!** Kök içleri aynı değilse işlem aynen kalır, toplanıp tek kök içine yazılamaz:
+$$\\sqrt{3} + \\sqrt{5} \\text{ ifadesi daha fazla sadeleşemez.}$$
+
+Ancak kök içleri aynıysa katsayılar toplanır:
+$$2\\sqrt{3} + 5\\sqrt{3} = 7\\sqrt{3}$$
+
+**Mentor Önerisi:** Köklü sayıları elmalarla karıştırma! Aynı tür elmalar toplanır ama armut ile elma toplanmaz. Tam kare olmayan sayıları kök dışına çıkarma konusunu bu akşam tekrar gözden geçir!`;
+        } else if (lowerText.includes('ebob') && lowerText.includes('ekok') && (lowerText.includes('küçük') || lowerText.includes('bir araya') || lowerText.includes('bina'))) {
+          responseText = `🎙️ **Ses Kaydı Analizi Yapıldı (EBOB/EKOK Karışıklığı Tespit Edildi!)**
+
+Kendi kendine sesli açıklama yaparak öğrenmeni test etmen mükemmel bir alışkanlık! Fakat EBOB ile EKOK formüllerinin kullanım yerlerini birbiriyle tam tersi karıştırıyorsun:
+
+❌ **Yanılgı:** "Küçük parçaları bir araya getirip büyük bir bütün oluştururken EBOB kullanılır" dedin.
+
+✅ **Gerçek Kural:**
+- **EKOK (En Küçük Ortak Kat):** Küçük parçalar (Örn: tuğlalar, cevizler, saat zilleri, küçük fayanslar) bir araya getirilip daha **büyük bir bütün/kat** oluşturuluyorsa (Parçadan Bütüne) kullanılır. Katlar her zaman büyür.
+- **EBOB (En Büyük Ortak Bölen):** Büyük bir bütün (Örn: tarla etrafı, bidsondaki yağlar, büyük kumaşlar) **küçük eşit parçalara** bölünüyorsa (Bütünden Parçaya) kullanılır. Bölenler her zaman küçültür.
+
+**Mentor Önerisi:** Bu pratik formülü aklında tut: "Bütünden parçaya gidiyorsan Bölen (EBOB), parçadan bütüne çıkıyorsan Kat (EKOK)!" Bir sonraki matematik sorusunda bu kuralı doğrudan uygula!`;
+        } else {
+          responseText = `🎙️ **Ses Kaydı Analizi Yapıldı (Genel Değerlendirme)**
+
+Kendi kelimelerinle yaptığın sesli kavram açıklamasını Google STT motoru üzerinden dinledim! Ses tonundaki kararlılık LGS kampındaki yüksek motivasyonunu gösteriyor.
+
+**Değerlendirme Raporu:**
+- Açıklama yaptığın konunun ana hatlarını temel seviyede kurmuşsun.
+- Ses analizi eşleşmelerine göre ifade akışın anlaşılır ve doğru terimler içeriyor.
+
+💡 **Hemen Uygula:** Günlük soru çözüm hedefine sadık kalarak, bu konudaki kazanım testlerini ve mentorunun sana sunduğu adım adım ipuçlarını takip etmeye devam et! Sınavlarda yüksek başarıyı yakalayacaksın!`;
+        }
+      } else {
+        // Simple intelligent parsing for written questions
+        if (lowerText.includes('üslü') || lowerText.includes('kuvvet')) {
+          responseText = 'Harika bir üslü sayı sorusu! LGS\'de üslü sayılarda çarpma kuralını çok sık kullanıyoruz. Eğer tabanlar aynıysa üsleri toplamalısın. Örneğin $2^5 \\cdot 2^3 = 2^8$ olur. Üsler aynı ise tabanları çarpmalısın.';
+        } else if (lowerText.includes('köklü') || lowerText.includes.call(lowerText, 'kök')) {
+          responseText = 'Köklü sayılar LGS\'de en çok soru gelen konulardan biridir. Tam kare sayıları (1, 4, 9, 16, 25, 36...) ezbere bilmek kök dışına çıkarma işlemlerinde sana çok büyük hız kazandıracaktır.';
+        } else if (lowerText.includes('çarpan') || lowerText.includes('kat') || lowerText.includes('asal')) {
+          responseText = 'Çarpanlar ve katlar konusunda asal çarpan algoritmasını iyi kullanmalısın. İki sayının çarpımı, o sayıların EBOB\'u ile EKOK\'unun çarpımına eşittir kuralını sakın unutma!';
+        }
+      }
+
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
         role: 'ai',
-        text: 'Güzel bir soru! Bu adımda tabanların aynı olduğuna dikkat etmelisin. Eğer tabanlar aynıysa üsleri toplaman yeterli olacaktır.',
+        text: responseText,
         timestamp: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
       };
       setMessages(prev => [...prev, aiResponse]);
-    }, 1000);
+    }, 1200);
   };
 
   const [resourceUploadTrigger, setResourceUploadTrigger] = useState(0);

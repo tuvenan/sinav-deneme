@@ -22,6 +22,9 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useFirebase } from './FirebaseContext';
+import { addLgsWeeklyCampToCalendar } from '../lib/googleCalendar';
+import { Calendar as CalendarIcon } from 'lucide-react';
 
 // Pre-loaded LGS Step-by-Step Questions
 const SAMPLE_QUESTIONS = [
@@ -135,6 +138,50 @@ type SubTab = 'main' | 'soru-cozum' | 'stratejik-ipucu' | 'hata-analiz' | 'rehbe
 
 export default function AIGuideView() {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('main');
+
+  const { accessToken, connectCalendar } = useFirebase();
+  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
+
+  const handleConnectCalendar = async () => {
+    setIsSyncingCalendar(true);
+    try {
+      const token = await connectCalendar();
+      if (token) {
+        alert('Google Takvim başarıyla bağlandı! Artık programınızı takviminize kaydedebilirsiniz.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Google Takvim bağlantısı başarısız oldu.');
+    } finally {
+      setIsSyncingCalendar(false);
+    }
+  };
+
+  const handleSyncCampToCalendar = async () => {
+    if (!accessToken) {
+      alert('Lütfen önce Google Takviminizi bağlayın.');
+      return;
+    }
+    const confirmed = window.confirm(
+      'Haftalık çalışma programındaki hedefleri Google Takviminize kaydetmek istiyor musunuz? Her çalışma günü için takvimizde etkinlik oluşturulacak.'
+    );
+    if (!confirmed) return;
+
+    setIsSyncingCalendar(true);
+    try {
+      const count = await addLgsWeeklyCampToCalendar(accessToken, {
+        weakTopic,
+        studyStyle,
+        tasks: weeklySchedule.tasks
+      });
+      alert(`Harika! ${count} adet ders çalışma etkinliği Google Takviminize başarıyla eklendi!`);
+    } catch (err: any) {
+      console.error(err);
+      alert('Takvim eşitlemesi sırasında bir hata oluştu. Lütfen tekrar deneyin.');
+    } finally {
+      setIsSyncingCalendar(false);
+    }
+  };
 
   // --- 1. SORU COZUM STATE ---
   const [selectedSample, setSelectedSample] = useState(SAMPLE_QUESTIONS[0]);
@@ -1232,6 +1279,37 @@ export default function AIGuideView() {
                       </div>
                     );
                   })}
+                </div>
+
+                {/* Google Calendar Sync Card */}
+                <div className="bg-primary/5 border border-primary/15 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-center gap-4">
+                  <div className="space-y-1 text-center sm:text-left">
+                    <h4 className="font-serif font-black text-primary text-sm flex items-center justify-center sm:justify-start gap-1.5">
+                      <CalendarIcon size={16} className="text-primary animate-pulse" />
+                      <span>Google Takvim Planlama Entegrasyonu</span>
+                    </h4>
+                    <p className="text-xs text-on-surface-variant max-w-xl">
+                      LGS kampındaki çalışma günlerini cep telefonunuz veya bilgisayarınızdaki Google Takvim'e anında aktarın. Önemli bildirimleri ve hatırlatıcıları kaçırmayın!
+                    </p>
+                  </div>
+                  
+                  {accessToken ? (
+                    <button
+                      onClick={handleSyncCampToCalendar}
+                      disabled={isSyncingCalendar}
+                      className="px-5 py-2.5 bg-primary hover:bg-primary-hover text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-md shrink-0 w-full sm:w-auto text-center cursor-pointer disabled:opacity-50"
+                    >
+                      {isSyncingCalendar ? 'Eşitleniyor...' : '📅 Takvime Kaydet'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleConnectCalendar}
+                      disabled={isSyncingCalendar}
+                      className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-md shrink-0 w-full sm:w-auto text-center cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <span>Google Takvimi Bağla</span>
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex justify-between items-center pt-2">
