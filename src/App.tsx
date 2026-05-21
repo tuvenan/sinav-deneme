@@ -12,6 +12,7 @@ import AnalysisView from './components/AnalysisView';
 import ResourcesView from './components/ResourcesView';
 import SettingsView from './components/SettingsView';
 import AIGuideView from './components/AIGuideView';
+import AdminView from './components/AdminView';
 import type { Question, Message, Difficulty, SolveHistory } from './types';
 import { useFirebase } from './components/FirebaseContext';
 import { getOrCreateUserProfile, getSolveHistories, addSolveHistory } from './lib/db';
@@ -79,6 +80,53 @@ export default function App() {
     }
   });
   const [activeTab, setActiveTab] = useState('calisma');
+
+  // Dynamic Theme/Style Customization apply effect
+  useEffect(() => {
+    const applyDynamicTheme = () => {
+      const savedTheme = localStorage.getItem('lgs_theme_config');
+      if (savedTheme) {
+        try {
+          const config = JSON.parse(savedTheme);
+          const root = document.documentElement;
+          if (config.primaryColor) root.style.setProperty('--color-primary', config.primaryColor);
+          if (config.accentColor) root.style.setProperty('--color-accent', config.accentColor);
+          if (config.surfaceColor) root.style.setProperty('--color-surface', config.surfaceColor);
+          if (config.surfaceDim) root.style.setProperty('--color-surface-dim', config.surfaceDim);
+          if (config.onSurface) root.style.setProperty('--color-on-surface', config.onSurface);
+          if (config.radiusXl) root.style.setProperty('--radius-xl', config.radiusXl);
+          if (config.fontSerif) {
+            root.style.setProperty('--font-serif', config.fontSerif);
+          }
+          if (config.fontSans) {
+            root.style.setProperty('--font-sans', config.fontSans);
+          }
+        } catch (err) {
+          console.error('Failed to parse dynamic theme configuration:', err);
+        }
+      } else {
+        // Reset to default variable states just in case
+        const root = document.documentElement;
+        root.style.removeProperty('--color-primary');
+        root.style.removeProperty('--color-accent');
+        root.style.removeProperty('--color-surface');
+        root.style.removeProperty('--color-surface-dim');
+        root.style.removeProperty('--color-on-surface');
+        root.style.removeProperty('--radius-xl');
+        root.style.removeProperty('--font-serif');
+        root.style.removeProperty('--font-sans');
+      }
+    };
+
+    applyDynamicTheme();
+    window.addEventListener('storage', applyDynamicTheme);
+    window.addEventListener('theme-changed', applyDynamicTheme);
+    return () => {
+      window.removeEventListener('storage', applyDynamicTheme);
+      window.removeEventListener('theme-changed', applyDynamicTheme);
+    };
+  }, []);
+
   const [questions, setQuestions] = useState<Question[]>(INITIAL_QUESTIONS);
   const [currentQuestion, setCurrentQuestion] = useState<Question>(INITIAL_QUESTIONS[0]);
   const [difficulty, setDifficulty] = useState<Difficulty>('Hepsi');
@@ -395,6 +443,22 @@ Kendi kelimelerinle yaptığın sesli kavram açıklamasını Google STT motoru 
           {activeTab === 'kaynaklar' && <ResourcesView uploadTrigger={resourceUploadTrigger} />}
           {activeTab === 'ai-rehber' && <AIGuideView />}
           {activeTab === 'ayarlar' && <SettingsView solveHistory={solveHistory} />}
+          {activeTab === 'admin' && (
+            <AdminView
+              questions={questions}
+              setQuestions={setQuestions}
+              solveHistory={solveHistory}
+              setSolveHistory={setSolveHistory}
+              correctStreak={correctStreak}
+              setCorrectStreak={setCorrectStreak}
+              progress={progress}
+              setProgress={setProgress}
+              messages={messages}
+              setMessages={setMessages}
+              currentQuestion={currentQuestion}
+              setCurrentQuestion={setCurrentQuestion}
+            />
+          )}
         </main>
         <AITutor
           messages={messages}

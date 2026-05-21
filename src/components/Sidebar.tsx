@@ -1,4 +1,4 @@
-import { BookOpen, FolderOpen, LayoutDashboard, Settings, TrendingUp, Upload, Zap } from 'lucide-react';
+import { BookOpen, FolderOpen, LayoutDashboard, Settings, TrendingUp, Upload, Zap, Shield } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface SidebarProps {
@@ -36,14 +36,6 @@ export default function Sidebar({ activeTab, setActiveTab, onUploadClick }: Side
             <span className="text-sm font-medium">{item.label}</span>
           </button>
         ))}
-
-        <button 
-          onClick={onUploadClick}
-          className="w-full mt-6 flex items-center gap-3 px-3 py-2.5 text-primary border border-outline bg-surface-bright rounded-md transition-all hover:bg-surface-dim font-semibold italic text-sm cursor-pointer"
-        >
-          <Upload size={16} />
-          <span>PDF/Kaynak Yükle</span>
-        </button>
       </nav>
 
       <div className="mt-auto space-y-4">
@@ -61,7 +53,19 @@ export default function Sidebar({ activeTab, setActiveTab, onUploadClick }: Side
           AI Rehberine Sor
         </motion.button>
 
-        <div className="pt-4 border-t border-outline">
+        <div className="pt-4 border-t border-outline space-y-1">
+          <button
+            onClick={() => setActiveTab('admin')}
+            className={`flex items-center gap-3 px-3 py-2 rounded-md transition-all w-full text-left ${
+              activeTab === 'admin'
+                ? 'text-primary font-bold bg-surface-dim border-l-4 border-primary'
+                : 'text-on-surface-variant hover:text-primary hover:bg-surface-dim'
+            }`}
+          >
+            <Shield size={18} className="text-indigo-600" />
+            <span className="text-sm font-medium">Admin Paneli</span>
+          </button>
+
           <button
             onClick={() => setActiveTab('ayarlar')}
             className={`flex items-center gap-3 px-3 py-2 rounded-md transition-all w-full text-left ${

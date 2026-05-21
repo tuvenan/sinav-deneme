@@ -293,9 +293,10 @@ Bu deneme ilk 3 üniteyi (Çarpanlar/Katlar, Üslü Sayılar, Kareköklü İfade
 
 interface ResourcesViewProps {
   uploadTrigger?: number;
+  isAdminMode?: boolean;
 }
 
-export default function ResourcesView({ uploadTrigger = 0 }: ResourcesViewProps = {}) {
+export default function ResourcesView({ uploadTrigger = 0, isAdminMode = false }: ResourcesViewProps = {}) {
   const { user } = useFirebase();
   const [files, setFiles] = useState<ResourceFile[]>(() => {
     const saved = localStorage.getItem('lgs_resources');
@@ -696,13 +697,15 @@ export default function ResourcesView({ uploadTrigger = 0 }: ResourcesViewProps 
             LGS sınav hazırlık sürecinde ders notlarınızı ve çalışma videolarınızı organize edin.
           </p>
         </div>
-        <button 
-          onClick={() => setIsUploadOpen(true)}
-          className="bg-primary text-white hover:bg-primary/90 transition-all font-bold text-xs uppercase tracking-widest px-5 py-3 rounded-xl shadow-md flex items-center gap-2 cursor-pointer border border-primary hover:scale-[1.02]"
-        >
-          <Plus size={16} />
-          Yeni Kaynak Ekle
-        </button>
+        {isAdminMode && (
+          <button 
+            onClick={() => setIsUploadOpen(true)}
+            className="bg-primary text-white hover:bg-primary/90 transition-all font-bold text-xs uppercase tracking-widest px-5 py-3 rounded-xl shadow-md flex items-center gap-2 cursor-pointer border border-primary hover:scale-[1.02]"
+          >
+            <Plus size={16} />
+            Yeni Kaynak Ekle
+          </button>
+        )}
       </div>
 
       {/* Quick Search & Format Tag Filters */}
@@ -905,13 +908,15 @@ export default function ResourcesView({ uploadTrigger = 0 }: ResourcesViewProps 
                         <CheckCircle size={15} />
                       </span>
                     )}
-                    <button
-                      onClick={(e) => handleDeleteFile(file.id, e)}
-                      className="p-1.5 rounded-lg border border-transparent text-on-surface-variant/40 hover:text-rose-500 hover:border-rose-100 hover:bg-rose-50/50 transition-all cursor-pointer"
-                      title="Kaynağı Sil"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    {isAdminMode && (
+                      <button
+                        onClick={(e) => handleDeleteFile(file.id, e)}
+                        className="p-1.5 rounded-lg border border-transparent text-on-surface-variant/40 hover:text-rose-500 hover:border-rose-100 hover:bg-rose-50/50 transition-all cursor-pointer"
+                        title="Kaynağı Sil"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
                 </div>
               );

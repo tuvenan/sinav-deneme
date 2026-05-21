@@ -32,3 +32,16 @@ export interface Message {
   timestamp: string;
   isHint?: boolean;
 }
+
+export interface ResourceFile {
+  id: string;
+  name: string;
+  size: string;
+  type: 'pdf' | 'video';
+  folder: 'Ders Notları' | 'Çıkmış Sorular' | 'Deneme Sınavları' | 'Video Çözümler';
+  topic: string;
+  content: string; // Summary math content or description notes
+  duration?: string; // e.g. "12:45"
+  videoUrl?: string;
+  notes?: string;
+}
