@@ -1,6 +1,6 @@
 {
-  "name": "LGS Mentor AI",
+  "name": "EduAi",
   "description": "Yapay zeka destekli LGS hazırlık platformu. Kişiselleştirilmiş matematik çalışma alanı ve anlık mentorluk desteği.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

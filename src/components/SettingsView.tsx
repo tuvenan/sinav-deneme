@@ -150,7 +150,7 @@ export default function SettingsView({ solveHistory = [] }: SettingsViewProps) {
       {
         id: '2',
         title: 'Önemli Hatırlatma',
-        content: "LGS Mentor AI: 'Bugün henüz günlük hedefine ulaşamadın. Üslü sayılardan 10 soru çözerek başlamaya ne dersin?'",
+        content: "EduAi: 'Bugün henüz günlük hedefine ulaşamadın. Üslü sayılardan 10 soru çözerek başlamaya ne dersin?'",
         timestamp: '2 saat önce',
         type: 'warning',
         read: false
@@ -319,7 +319,7 @@ export default function SettingsView({ solveHistory = [] }: SettingsViewProps) {
   // Trigger Mock Browser Notification Banner inside the UI
   const triggerTestNotificationMsg = () => {
     const messages = [
-      { title: 'LGS Mentor AI', content: "Bugün henüz hedefine ulaşamadın. Üslü sayılardan 10 soru çözerek başlamaya ne dersin?", type: 'warning' as const },
+      { title: 'EduAi', content: "Bugün henüz hedefine ulaşamadın. Üslü sayılardan 10 soru çözerek başlamaya ne dersin?", type: 'warning' as const },
       { title: 'Hedef Güncellemesi', content: "Kabataş Erkek Lisesi kazanma ihtimalin bu hafta %2.4 arttı!", type: 'target' as const },
       { title: 'AI Mentor Önerisi', content: "Son denemendeki felsefe/türkçe sorularından ötürü okuma hızını artırmak için paragraf kaynaklarına göz atmalısın.", type: 'tip' as const },
       { title: 'Süreç Raporu', content: "Haftalık çalışma turların tamamlandı! PDF/Kaynaklar sayfasından yeni raporunu inceleyebilirsin.", type: 'mentorship' as const }
@@ -424,7 +424,7 @@ export default function SettingsView({ solveHistory = [] }: SettingsViewProps) {
   const handleExportData = () => {
     try {
       const dataPayload = {
-        app: "LGS Mentor AI",
+        app: "EduAi",
         savedAt: new Date().toISOString(),
         totalSolved: solveHistory.length,
         settings: settings,
@@ -467,7 +467,7 @@ export default function SettingsView({ solveHistory = [] }: SettingsViewProps) {
             <Bell size={18} className="animate-swing" />
           </div>
           <div className="space-y-1">
-            <p className="text-[10px] uppercase font-bold tracking-widest text-primary font-mono">LGS Mentor AI Simülatorü</p>
+            <p className="text-[10px] uppercase font-bold tracking-widest text-primary font-mono">EduAi Simülatorü</p>
             <p className="text-xs text-on-surface leading-normal font-medium">{testNotificationMsg}</p>
           </div>
         </div>
@@ -1155,7 +1155,7 @@ export default function SettingsView({ solveHistory = [] }: SettingsViewProps) {
                   <div className="space-y-1 text-center sm:text-left">
                     <span className="text-[10px] font-mono font-black tracking-widest uppercase text-primary">Mevcut Durum</span>
                     <h4 className="font-serif font-black text-lg text-primary italic">
-                      {settings.membershipType === 'Premium LGS Şampiyon' ? '⭐ Premium LGS Şampiyon Üyeliği' : 'LGS Mentor Klasik (Ücretsiz)'}
+                      {settings.membershipType === 'Premium LGS Şampiyon' ? '⭐ Premium LGS Şampiyon Üyeliği' : 'EduAi Klasik (Ücretsiz)'}
                     </h4>
                     <p className="text-xs text-on-surface-variant">
                       {settings.membershipType === 'Premium LGS Şampiyon' 

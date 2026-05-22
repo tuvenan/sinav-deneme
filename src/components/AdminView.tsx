@@ -3,7 +3,7 @@ import {
   ShieldAlert, Sparkles, Check, Settings, TrendingUp, FolderOpen, 
   Upload, Zap, BookOpen, Users, Sliders, Database, Mic, Plus, 
   Trash2, Play, RefreshCw, CheckCircle, Search, Code, Cpu, Info, 
-  ArrowRight, Save, LayoutGrid, Award, Server, AlertCircle
+  ArrowRight, Save, LayoutGrid, Award, Server, AlertCircle, Palette
 } from 'lucide-react';
 import type { Question, Difficulty, SolveHistory, Message } from '../types';
 import ResourcesView from './ResourcesView';
@@ -304,7 +304,7 @@ export default function AdminView({
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           </div>
           <h1 className="text-3xl font-serif font-black text-primary tracking-tight mt-1">
-            LGS Mentor Admin Merkezi
+            EduAi Admin Merkezi
           </h1>
           <p className="text-xs text-on-surface-variant font-medium mt-1 leading-relaxed">
             Sistem parametrelerini kalibre edin, soru havuzunu yönetin ve Google STT ses tanıma testlerini yapın.
@@ -492,6 +492,17 @@ export default function AdminView({
           <span>PDF &amp; Kaynak Yönetimi</span>
         </button>
 
+        {/* Tema & Görsel Stil Yönetimi */}
+        <button
+          onClick={() => setAdminTab('stil')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider shrink-0 transition-all cursor-pointer ${
+            adminTab === 'stil' ? 'bg-[#ea580c] text-white shadow-sm' : 'text-on-surface-variant hover:bg-neutral-100 hover:text-primary'
+          }`}
+        >
+          <Palette size={14} className="shrink-0" />
+          <span>Görsel Stil &amp; Tema</span>
+        </button>
+
       </div>
 
       {/* Main Grid View */}
@@ -510,7 +521,7 @@ export default function AdminView({
                 </div>
                 
                 <p className="text-xs text-on-surface-variant leading-relaxed">
-                  LGS Mentor platformuna enjekte edilmiş olan gelişmiş yönetim katmanına hoş geldiniz. Bu panel üzerinden öğrencilerinizin arayüzünde görünen zorluk ayarlarını, prompt esnemelerini, ses tanıma motoru parametrelerini ve soru veri ambarını gerçek zamanlı manipüle edebilirsiniz. Yapılan her güncelleme, çalışma ekranına doğrudan yansımaktadır.
+                  EduAi platformuna enjekte edilmiş olan gelişmiş yönetim katmanına hoş geldiniz. Bu panel üzerinden öğrencilerinizin arayüzünde görünen zorluk ayarlarını, prompt esnemelerini, ses tanıma motoru parametrelerini ve soru veri ambarını gerçek zamanlı manipüle edebilirsiniz. Yapılan her güncelleme, çalışma ekranına doğrudan yansımaktadır.
                 </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3">
@@ -1006,15 +1017,15 @@ export default function AdminView({
                         <button
                           onClick={() => {
                             const current = JSON.parse(localStorage.getItem('lgs_settings') || '{}');
-                            const updated = { ...current, membershipType: 'Premium Gold' };
+                            const updated = { ...current, membershipType: 'Premium LGS Şampiyon' };
                             localStorage.setItem('lgs_settings', JSON.stringify(updated));
                             window.dispatchEvent(new Event('storage'));
-                            addLog('success', 'SIMULATION', 'Öğrenci üyelik tipi "Premium Gold" olarak simüle edildi.');
-                            alert('Tebrikler! Üyelik tipi sistem genelinde Premium Gold derecesine yükseltildi.');
+                            addLog('success', 'SIMULATION', 'Öğrenci üyelik tipi "Premium LGS Şampiyon" olarak simüle edildi.');
+                            alert('Tebrikler! Üyelik tipi sistem genelinde Premium LGS Şampiyon derecesine yükseltildi.');
                           }}
                           className="flex-1 py-1.5 bg-gradient-to-r from-amber-500 to-yellow-600 text-white rounded-lg text-[10px] font-bold text-center uppercase tracking-wider transition-all shadow-md cursor-pointer"
                         >
-                          👑 Gold Premium Yap
+                          👑 Premium Şampiyon Yap
                         </button>
                       </div>
                     </div>
@@ -1291,7 +1302,7 @@ export default function AdminView({
                 </div>
 
                 <p className="text-xs text-on-surface-variant leading-relaxed">
-                  LGS Mentor sisteminde gerçekleşen tüm kullanıcı eylemleri, sayfa geçişleri, firestore önbellek sorguları ve veritabanı simülasyonları aşağıda gerçek zamanlı listelenmektedir.
+                  EduAi sisteminde gerçekleşen tüm kullanıcı eylemleri, sayfa geçişleri, firestore önbellek sorguları ve veritabanı simülasyonları aşağıda gerçek zamanlı listelenmektedir.
                 </p>
 
                 {/* Log terminal */}
@@ -1339,6 +1350,286 @@ export default function AdminView({
                 </p>
               </div>
               <ResourcesView isAdminMode={true} />
+            </div>
+          )}
+
+          {/* 8. DYNAMIC STYLE & THEME MANAGEMENT PANEL */}
+          {adminTab === 'stil' && (
+            <div className="space-y-6">
+              
+              {/* Header card */}
+              <div className="bg-white border border-outline rounded-3xl p-6 shadow-sm space-y-2">
+                <div className="flex items-center gap-2 pb-2 border-b border-light-outline">
+                  <Palette size={18} className="text-[#ea580c]" />
+                  <h2 className="text-lg font-serif font-black text-primary">Sitenin Genel Görünüm ve Stil Yönetimi</h2>
+                </div>
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  Platformun renk paletini, kenar yuvarlaklıklarını ve tipografi fontlarını doğrudan buradan kalibre edebilirsiniz. Seçtiğiniz ayarlar ya da şablonlar anında tüm site genelinde aktifleşir ve tarayıcı önbelleğine kaydedilir.
+                </p>
+              </div>
+
+              {/* Theme Presets */}
+              <div className="bg-white border border-outline rounded-3xl p-6 shadow-sm space-y-4">
+                <h3 className="text-xs font-black uppercase tracking-widest text-primary border-b border-outline pb-2">
+                  Hazır Stil &amp; Tema Şablonları (Presets)
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Preset 1: Asil Gece */}
+                  <div 
+                    onClick={() => applyThemePreset('Asil Gece (Klasik Slate)', {
+                      primaryColor: '#0f172a',
+                      accentColor: '#4f46e5',
+                      surfaceColor: '#fdfdfd',
+                      surfaceDim: '#f1f5f9',
+                      onSurface: '#0f172a',
+                      radiusXl: '0.75rem',
+                      fontSerif: '"Playfair Display", serif',
+                      fontSans: '"Inter", sans-serif'
+                    })}
+                    className="p-4 bg-slate-50 border border-slate-200 hover:border-indigo-400 rounded-2xl cursor-pointer transition-all hover:shadow-md flex justify-between items-center group"
+                  >
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">Asil Gece (Slate default)</h4>
+                      <p className="text-[10px] text-slate-500">Koyu lacivert başlıklar, mor vurgular, minimalist modern yaklaşım.</p>
+                    </div>
+                    <div className="flex gap-1.5 shrink-0 pl-2">
+                      <span className="w-3.5 h-3.5 rounded-full bg-[#0f172a] inline-block border border-black/10" />
+                      <span className="w-3.5 h-3.5 rounded-full bg-[#4f46e5] inline-block border border-black/10" />
+                      <span className="w-3.5 h-3.5 rounded-full bg-[#f1f5f9] inline-block border border-black/10" />
+                    </div>
+                  </div>
+
+                  {/* Preset 2: Zümrüt Şampiyon */}
+                  <div 
+                    onClick={() => applyThemePreset('Zümrüt Şampiyon (Emerald)', {
+                      primaryColor: '#064e3b',
+                      accentColor: '#10b981',
+                      surfaceColor: '#f8fafc',
+                      surfaceDim: '#f0fdf4',
+                      onSurface: '#064e3b',
+                      radiusXl: '1.25rem',
+                      fontSerif: '"Georgia", serif',
+                      fontSans: '"Inter", sans-serif'
+                    })}
+                    className="p-4 bg-emerald-50/50 border border-emerald-100 hover:border-emerald-400 rounded-2xl cursor-pointer transition-all hover:shadow-md flex justify-between items-center group"
+                  >
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-bold text-emerald-900 group-hover:text-emerald-700 transition-colors">Zümrüt Şampiyon (Emerald)</h4>
+                      <p className="text-[10px] text-emerald-700">Canlandırıcı yeşil tonları, yuvarlatılmış köşeler, üstün motivasyon.</p>
+                    </div>
+                    <div className="flex gap-1.5 shrink-0 pl-2">
+                      <span className="w-3.5 h-3.5 rounded-full bg-[#064e3b] inline-block border border-black/10" />
+                      <span className="w-3.5 h-3.5 rounded-full bg-[#10b981] inline-block border border-black/10" />
+                      <span className="w-3.5 h-3.5 rounded-full bg-[#f0fdf4] inline-block border border-black/10" />
+                    </div>
+                  </div>
+
+                  {/* Preset 3: Volkanik Turuncu */}
+                  <div 
+                    onClick={() => applyThemePreset('Volkanik Enerji (Orange)', {
+                      primaryColor: '#451a03',
+                      accentColor: '#ea580c',
+                      surfaceColor: '#fffefb',
+                      surfaceDim: '#fef3c7',
+                      onSurface: '#451a03',
+                      radiusXl: '0.4rem',
+                      fontSerif: '"Trebuchet MS", sans-serif',
+                      fontSans: '"Inter", sans-serif'
+                    })}
+                    className="p-4 bg-yellow-50/50 border border-yellow-100 hover:border-amber-500 rounded-2xl cursor-pointer transition-all hover:shadow-md flex justify-between items-center group"
+                  >
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-bold text-amber-950 group-hover:text-amber-700 transition-colors">Volkanik Enerji (Warm)</h4>
+                      <p className="text-[10px] text-amber-700">Sıcak turuncu detaylar, keskin köşeler, yüksek disiplin vurgusu.</p>
+                    </div>
+                    <div className="flex gap-1.5 shrink-0 pl-2">
+                      <span className="w-3.5 h-3.5 rounded-full bg-[#451a03] inline-block border border-black/10" />
+                      <span className="w-3.5 h-3.5 rounded-full bg-[#ea580c] inline-block border border-black/10" />
+                      <span className="w-3.5 h-3.5 rounded-full bg-[#fef3c7] inline-block border border-black/10" />
+                    </div>
+                  </div>
+
+                  {/* Preset 4: Derin Kozmos */}
+                  <div 
+                    onClick={() => applyThemePreset('Mistik Kozmos (Indigo)', {
+                      primaryColor: '#1e1b4b',
+                      accentColor: '#d946ef',
+                      surfaceColor: '#faf8ff',
+                      surfaceDim: '#fae8ff',
+                      onSurface: '#1e1b4b',
+                      radiusXl: '1.75rem',
+                      fontSerif: '"Georgia", serif',
+                      fontSans: '"JetBrains Mono", monospace'
+                    })}
+                    className="p-4 bg-purple-50/50 border border-purple-100 hover:border-purple-400 rounded-2xl cursor-pointer transition-all hover:shadow-md flex justify-between items-center group"
+                  >
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-bold text-purple-950 group-hover:text-purple-700 transition-colors">Mistik Kozmos (Dinamik)</h4>
+                      <p className="text-[10px] text-purple-700">Derin mor arka planlar, pembe neon detaylar ve geniş elips köşeler.</p>
+                    </div>
+                    <div className="flex gap-1.5 shrink-0 pl-2">
+                      <span className="w-3.5 h-3.5 rounded-full bg-[#1e1b4b] inline-block border border-black/10" />
+                      <span className="w-3.5 h-3.5 rounded-full bg-[#d946ef] inline-block border border-black/10" />
+                      <span className="w-3.5 h-3.5 rounded-full bg-[#fae8ff] inline-block border border-black/10" />
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Individual style customizer controllers */}
+              <div className="bg-white border border-outline rounded-3xl p-6 shadow-sm space-y-6">
+                <div className="flex items-center justify-between pb-2 border-b border-light-outline">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-primary">
+                    Özel Renk ve Geometri Kalibrasyonları
+                  </h3>
+                  <button
+                    onClick={resetStylesToDefault}
+                    className="text-[10px] font-bold text-rose-600 hover:text-rose-700 uppercase tracking-widest cursor-pointer flex items-center gap-1 bg-rose-50 hover:bg-rose-100/55 px-3 py-1.5 rounded-lg border border-rose-100"
+                  >
+                    <RefreshCw size={10} />
+                    <span>Orijinal Defaulta Sıfırla</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  
+                  {/* Primary Color Picker */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-primary block">Birincil Başlık ve Metin Rengi (Primary):</label>
+                    <div className="flex gap-3">
+                      <input 
+                        type="color" 
+                        value={styleConfig.primaryColor} 
+                        onChange={(e) => updateStyleParam('primaryColor', e.target.value)}
+                        className="w-10 h-10 rounded-lg border border-outline cursor-pointer"
+                      />
+                      <input 
+                        type="text" 
+                        value={styleConfig.primaryColor} 
+                        onChange={(e) => updateStyleParam('primaryColor', e.target.value)}
+                        className="flex-1 bg-surface-dim px-3 py-1.5 rounded-xl border border-outline text-xs font-mono font-bold text-primary"
+                      />
+                    </div>
+                    <span className="text-[10px] text-on-surface-variant block leading-relaxed">Başlıklar ve ana butonların arka plan renklerini doğrudan domine eder.</span>
+                  </div>
+
+                  {/* Accent Color Picker */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-primary block">Etkileşim ve Vurgu Rengi (Accent):</label>
+                    <div className="flex gap-3">
+                      <input 
+                        type="color" 
+                        value={styleConfig.accentColor} 
+                        onChange={(e) => updateStyleParam('accentColor', e.target.value)}
+                        className="w-10 h-10 rounded-lg border border-outline cursor-pointer"
+                      />
+                      <input 
+                        type="text" 
+                        value={styleConfig.accentColor} 
+                        onChange={(e) => updateStyleParam('accentColor', e.target.value)}
+                        className="flex-1 bg-surface-dim px-3 py-1.5 rounded-xl border border-outline text-xs font-mono font-bold text-primary"
+                      />
+                    </div>
+                    <span className="text-[10px] text-on-surface-variant block leading-relaxed">İkonlar, simgeler ve buton hover aksiyonlarının rengidir.</span>
+                  </div>
+
+                  {/* Surface Color Picker */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-primary block">Kart Temiz Arka Plan Rengi (Surface Bright):</label>
+                    <div className="flex gap-3">
+                      <input 
+                        type="color" 
+                        value={styleConfig.surfaceColor} 
+                        onChange={(e) => updateStyleParam('surfaceColor', e.target.value)}
+                        className="w-10 h-10 rounded-lg border border-outline cursor-pointer"
+                      />
+                      <input 
+                        type="text" 
+                        value={styleConfig.surfaceColor} 
+                        onChange={(e) => updateStyleParam('surfaceColor', e.target.value)}
+                        className="flex-1 bg-surface-dim px-3 py-1.5 rounded-xl border border-outline text-xs font-mono font-bold text-primary"
+                      />
+                    </div>
+                    <span className="text-[10px] text-on-surface-variant block leading-relaxed">Sanal kartların ana gövdesi için kullanılan parlak renk tonu.</span>
+                  </div>
+
+                  {/* Surface Dim Color Picker */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-primary block">Sayfa Arka Plan &amp; Çerçeve Rengi (Surface Dim):</label>
+                    <div className="flex gap-3">
+                      <input 
+                        type="color" 
+                        value={styleConfig.surfaceDim} 
+                        onChange={(e) => updateStyleParam('surfaceDim', e.target.value)}
+                        className="w-10 h-10 rounded-lg border border-outline cursor-pointer"
+                      />
+                      <input 
+                        type="text" 
+                        value={styleConfig.surfaceDim} 
+                        onChange={(e) => updateStyleParam('surfaceDim', e.target.value)}
+                        className="flex-1 bg-surface-dim px-3 py-1.5 rounded-xl border border-outline text-xs font-mono font-bold text-primary"
+                      />
+                    </div>
+                    <span className="text-[10px] text-on-surface-variant block leading-relaxed">Sayfa ana arka planı ve pasif durum kutusu dolgusudur.</span>
+                  </div>
+
+                  {/* Border Radius (Kenarlık Yuvarlaklıkları) */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-primary block">Kenar Köşe Yuvarlaklık Değeri (Radius-Xl):</label>
+                    <div className="relative">
+                      <select
+                        value={styleConfig.radiusXl}
+                        onChange={(e) => updateStyleParam('radiusXl', e.target.value)}
+                        className="w-full bg-surface-dim px-3 py-2 rounded-xl border border-outline text-xs font-bold text-primary cursor-pointer appearance-none"
+                      >
+                        <option value="0rem">Keskin (0px)</option>
+                        <option value="0.25rem">Hafif Yumuşak (4px)</option>
+                        <option value="0.5rem">Orta Oval (8px)</option>
+                        <option value="0.75rem">Standart Derin (12px)</option>
+                        <option value="1rem">Zengin Kapsayıcı (16px)</option>
+                        <option value="1.5rem">Ultra Kapsayıcı (24px)</option>
+                        <option value="2rem">Dairesel Elips (32px)</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-primary">
+                        <Sliders size={12} />
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-on-surface-variant block leading-relaxed">Diyagram, panel ve buton köşelerinin yuvarlanma yoğunluğunu optimize eder.</span>
+                  </div>
+
+                  {/* OnSurface (Text On Surface) */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-primary block">Genel Gövde Yazı Rengi (OnSurface):</label>
+                    <div className="flex gap-3">
+                      <input 
+                        type="color" 
+                        value={styleConfig.onSurface} 
+                        onChange={(e) => updateStyleParam('onSurface', e.target.value)}
+                        className="w-10 h-10 rounded-lg border border-outline cursor-pointer"
+                      />
+                      <input 
+                        type="text" 
+                        value={styleConfig.onSurface} 
+                        onChange={(e) => updateStyleParam('onSurface', e.target.value)}
+                        className="flex-1 bg-surface-dim px-3 py-1.5 rounded-xl border border-outline text-xs font-mono font-bold text-primary"
+                      />
+                    </div>
+                    <span className="text-[10px] text-on-surface-variant block leading-relaxed">Tüm paragraf ve kılavuz açıklamalarında kullanılan genel metin rengidir.</span>
+                  </div>
+
+                </div>
+
+                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex gap-3">
+                  <span className="p-1 px-2.5 h-max rounded-lg bg-amber-500 text-white font-mono text-[10px] font-black uppercase tracking-wider">NOT</span>
+                  <p className="text-[10px] text-amber-950 leading-relaxed font-bold">
+                    Burada yaptığınız her renk düzenlemesi, tarayıcıda tanımladığımız CSS Custom Variables özellikleri aracılığıyla anlık olarak işlenir. Sitedeki özel butonlar, grafik sınırları ve başlık fontları bu değişkenler aracılığıyla senkronize çalışmaktadır.
+                  </p>
+                </div>
+
+              </div>
+
             </div>
           )}
 

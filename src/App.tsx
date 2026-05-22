@@ -127,8 +127,35 @@ export default function App() {
     };
   }, []);
 
-  const [questions, setQuestions] = useState<Question[]>(INITIAL_QUESTIONS);
-  const [currentQuestion, setCurrentQuestion] = useState<Question>(INITIAL_QUESTIONS[0]);
+  const [questions, setQuestions] = useState<Question[]>(() => {
+    const saved = localStorage.getItem('lgs_questions_pool');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (e) {
+        console.error('Failed to parse lgs_questions_pool:', e);
+      }
+    }
+    // Seed localStorage if empty
+    localStorage.setItem('lgs_questions_pool', JSON.stringify(INITIAL_QUESTIONS));
+    return INITIAL_QUESTIONS;
+  });
+
+  const [currentQuestion, setCurrentQuestion] = useState<Question>(() => {
+    const saved = localStorage.getItem('lgs_questions_pool');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed[0];
+        }
+      } catch (e) {}
+    }
+    return INITIAL_QUESTIONS[0];
+  });
   const [difficulty, setDifficulty] = useState<Difficulty>('Hepsi');
   const [correctStreak, setCorrectStreak] = useState(0);
   const [progress, setProgress] = useState(60);
@@ -501,7 +528,7 @@ Kendi kelimelerinle yaptığın sesli kavram açıklamasını Google STT motoru 
 
               {/* Title */}
               <h2 className="text-2xl font-serif font-black text-primary tracking-tight mb-2">
-                LGS Mentor AI ile Dereceye Hazırlan! 🚀
+                EduAi ile Dereceye Hazırlan! 🚀
               </h2>
               <p className="text-xs text-on-surface-variant max-w-sm mx-auto mb-6 leading-relaxed">
                 Platformumuzun tüm kişiselleştirilmiş analizlerini ve çalışma kütüphanesini bulut güvencesi ile kullanın.

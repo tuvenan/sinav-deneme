@@ -124,7 +124,7 @@ export async function addLgsWeeklyCampToCalendar(
     
     const event: GoogleCalendarEvent = {
       summary: `📚 LGS Çalışması: ${task.title}`,
-      description: `Konu: ${weeklySchedule.weakTopic}\nKategori: ${weeklySchedule.studyStyle}\nHedef Soru: +${task.target}\n\nTaktik / İpucu: ${task.tip}\n\nLGS Mentor AI tarafından otomatik oluşturulmuştur. Başarılar dileriz!`,
+      description: `Konu: ${weeklySchedule.weakTopic}\nKategori: ${weeklySchedule.studyStyle}\nHedef Soru: +${task.target}\n\nTaktik / İpucu: ${task.tip}\n\nEduAi tarafından otomatik oluşturulmuştur. Başarılar dileriz!`,
       start: {
         dateTime: startIso,
         timeZone: 'Europe/Istanbul'
@@ -167,7 +167,7 @@ export async function setDailyStudyReminder(
   
   const event: GoogleCalendarEvent = {
     summary: '🔔 LGS Günlük Soru Çözme Saati!',
-    description: `Günlük soru çözme hedefine ulaşma zamanı! Hedefin: ${targetSoruGoal} soru çözmek.\n\n"Bugün atmadığın adım, yarın seni hedeften bir adım daha uzaklaştırır."\n\nLGS Mentor AI Danışmanlık`,
+    description: `Günlük soru çözme hedefine ulaşma zamanı! Hedefin: ${targetSoruGoal} soru çözmek.\n\n"Bugün atmadığın adım, yarın seni hedeften bir adım daha uzaklaştırır."\n\nEduAi Danışmanlık`,
     start: {
       dateTime: startIso,
       timeZone: 'Europe/Istanbul'

@@ -29,6 +29,7 @@ export default function AITutor({ messages, onSendMessage, progress, errorAnalys
   const streamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const recognitionRef = useRef<any | null>(null);
+  const isRecordingRef = useRef(false);
 
   // Auto-scroll chat canvas
   useEffect(() => {
@@ -92,7 +93,7 @@ export default function AITutor({ messages, onSendMessage, progress, errorAnalys
       if (!canvasCtx) return;
 
       const draw = () => {
-        if (!isRecording) return;
+        if (!isRecordingRef.current) return;
         animationFrameRef.current = requestAnimationFrame(draw);
 
         analyser.getByteFrequencyData(dataArray);
@@ -144,7 +145,7 @@ export default function AITutor({ messages, onSendMessage, progress, errorAnalys
 
     let phase = 0;
     const drawMock = () => {
-      if (!isRecording) return;
+      if (!isRecordingRef.current) return;
       animationFrameRef.current = requestAnimationFrame(drawMock);
       phase += 0.2;
 
@@ -229,6 +230,7 @@ export default function AITutor({ messages, onSendMessage, progress, errorAnalys
   };
 
   const startRecording = () => {
+    isRecordingRef.current = true;
     setIsRecording(true);
     setTranscript('');
     setInterimTranscript('');
@@ -241,6 +243,7 @@ export default function AITutor({ messages, onSendMessage, progress, errorAnalys
   };
 
   const stopActiveStream = () => {
+    isRecordingRef.current = false;
     // Stop recording and close sound components
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());

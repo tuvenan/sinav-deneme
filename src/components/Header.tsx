@@ -9,7 +9,8 @@ import {
   Sparkles, 
   X, 
   ChevronRight, 
-  BookOpen 
+  BookOpen,
+  Clock
 } from 'lucide-react';
 import { useFirebase } from './FirebaseContext';
 
@@ -72,6 +73,17 @@ export default function Header() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showResults, setShowResults] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const [currentTime, setCurrentTime] = useState(() => {
+    return new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  });
+
+  useEffect(() => {
+    const clockInterval = setInterval(() => {
+      setCurrentTime(new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    }, 1000);
+    return () => clearInterval(clockInterval);
+  }, []);
 
   useEffect(() => {
     const loadSettings = () => {
@@ -175,7 +187,7 @@ export default function Header() {
   return (
     <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-outline z-50 px-6 flex items-center justify-between">
       <div className="flex items-center gap-4">
-        <span className="text-xl font-bold font-serif text-primary tracking-tight">LGS Mentor AI</span>
+        <span className="text-xl font-bold font-serif text-primary tracking-tight">EduAi</span>
         
         {/* Interactive Search Bar wrapper container */}
         <div ref={containerRef} className="hidden md:block relative">
@@ -320,7 +332,7 @@ export default function Header() {
               {/* Bottom Quick Tips */}
               <div className="px-4 py-2 bg-surface-dim border-t border-outline text-[9px] text-on-surface-variant/80 flex items-center justify-between">
                 <span>Sorular, ders özetleri veya videolar arasında canlı arar.</span>
-                <span className="font-bold text-primary italic">LGS Mentor AI</span>
+                <span className="font-bold text-primary italic">EduAi</span>
               </div>
 
             </div>
@@ -329,9 +341,9 @@ export default function Header() {
       </div>
 
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-primary font-semibold bg-surface-dim border border-outline">
-          <Timer size={16} />
-          <span className="text-sm font-sans">24:15</span>
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-primary font-semibold bg-surface-dim border border-outline" title="Yerel Saat">
+          <Clock size={16} className="text-primary" />
+          <span className="text-sm font-sans tracking-wide">{currentTime}</span>
         </div>
 
         <button className="p-2 rounded-full hover:bg-surface-dim transition-colors text-on-surface-variant cursor-pointer">

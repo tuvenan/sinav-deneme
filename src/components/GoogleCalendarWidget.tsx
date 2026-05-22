@@ -79,7 +79,7 @@ export default function GoogleCalendarWidget() {
 
       const newEvent: GoogleCalendarEvent = {
         summary: `📚 LGS Çalışma Planı: ${topic}`,
-        description: `Hedef: +${sourceGoal} soru çözüm ve analiz.\n\n"Başarının sırrı, her gün düzenli adım atmaktır."\nLGS Mentor AI Danışmanlık`,
+        description: `Hedef: +${sourceGoal} soru çözüm ve analiz.\n\n"Başarının sırrı, her gün düzenli adım atmaktır."\nEduAi Danışmanlık`,
         start: {
           dateTime: startIso,
           timeZone: 'Europe/Istanbul'
