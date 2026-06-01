@@ -3,7 +3,7 @@ import {
   ShieldAlert, Sparkles, Check, Settings, TrendingUp, FolderOpen, 
   Upload, Zap, BookOpen, Users, Sliders, Database, Mic, Plus, 
   Trash2, Play, RefreshCw, CheckCircle, Search, Code, Cpu, Info, 
-  ArrowRight, Save, LayoutGrid, Award, Server, AlertCircle, Palette
+  ArrowRight, Save, LayoutGrid, Award, Server, AlertCircle, Palette, Image
 } from 'lucide-react';
 import type { Question, Difficulty, SolveHistory, Message } from '../types';
 import ResourcesView from './ResourcesView';
@@ -68,6 +68,7 @@ export default function AdminView({
   const [qHint, setQHint] = useState('');
   const [qErrorAnalysis, setQErrorAnalysis] = useState('');
   const [qErrorType, setQErrorType] = useState('Kural Karışıklığı');
+  const [qImageUrl, setQImageUrl] = useState('');
 
   // Prompt calibration state
   const [promptTone, setPromptTone] = useState<'Sokratesçi' | 'Akademik' | 'Çok Yumuşak' | 'Motivasyonel'>('Sokratesçi');
@@ -185,6 +186,7 @@ export default function AdminView({
     setQHint(q.hint);
     setQErrorAnalysis(q.errorAnalysis);
     setQErrorType(q.errorType);
+    setQImageUrl(q.imageUrl || '');
   };
 
   const handleSaveQuestion = () => {
@@ -211,7 +213,8 @@ export default function AdminView({
       options: compiledOptions,
       hint: qHint,
       errorAnalysis: qErrorAnalysis,
-      errorType: qErrorType
+      errorType: qErrorType,
+      imageUrl: qImageUrl.trim() || undefined
     };
 
     let newPool: Question[] = [];
@@ -249,6 +252,7 @@ export default function AdminView({
     setQHint('');
     setQErrorAnalysis('');
     setQErrorType('Kural Karışıklığı');
+    setQImageUrl('');
   };
 
   const handleDeleteQuestion = (id: string) => {
@@ -820,6 +824,20 @@ export default function AdminView({
                     </div>
                   </div>
 
+                  {/* Görsel İpucu URL */}
+                  <div className="space-y-1.5 font-semibold text-xs">
+                    <label className="text-primary block flex items-center gap-1.5">
+                      Görsel İpucu URL'si <span className="font-normal text-on-surface-variant/70 italic">(İsteğe bağlı - Diyagramlar, grafikler ve geometrik çizimler için görsel web adresi veya lokal görsel yolu)</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Örn: https://images.unsplash.com/... veya lokal görsel adresi"
+                      value={qImageUrl}
+                      onChange={(e) => setQImageUrl(e.target.value)}
+                      className="w-full bg-surface-dim border border-outline rounded-xl p-3 focus:outline-none focus:border-primary text-primary font-medium"
+                    />
+                  </div>
+
                   <div className="space-y-1.5">
                     <label className="text-primary block">Hedeflenen Hata Analizi Tavsiyesi (Error Warning Suggestion)</label>
                     <textarea
@@ -880,6 +898,12 @@ export default function AdminView({
                             <span className="bg-neutral-100 border border-neutral-200 text-neutral-800 font-mono font-bold text-[10px] px-2 py-0.5 rounded">
                               Soru #{q.id}
                             </span>
+                            {q.imageUrl && (
+                              <span className="bg-sky-50 border border-sky-100 text-sky-700 font-mono font-bold text-[10px] px-2 py-0.5 rounded flex items-center gap-1" title="Görsel İpucu Mevcut">
+                                <Image size={10} className="text-sky-600" />
+                                <span>Görsel İpucu</span>
+                              </span>
+                            )}
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                               q.difficulty === 'Zor' 
                                 ? 'bg-rose-50 border border-rose-100 text-rose-600' 

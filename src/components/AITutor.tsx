@@ -1,4 +1,4 @@
-import { Bot, MoreVertical, Send, ShieldAlert, Mic, MicOff, Square, Trash2, HelpCircle, Sparkles, Check } from 'lucide-react';
+import { Bot, MoreVertical, Send, ShieldAlert, Mic, MicOff, Square, Trash2, HelpCircle, Sparkles, Check, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useRef, useEffect, useState } from 'react';
 import type { Message } from '../types';
@@ -8,9 +8,11 @@ interface AITutorProps {
   onSendMessage: (text: string) => void;
   progress: number;
   errorAnalysis?: { type: string; suggestion: string };
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-export default function AITutor({ messages, onSendMessage, progress, errorAnalysis }: AITutorProps) {
+export default function AITutor({ messages, onSendMessage, progress, errorAnalysis, isOpen, onClose }: AITutorProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -332,8 +334,19 @@ export default function AITutor({ messages, onSendMessage, progress, errorAnalys
   ];
 
   return (
-    <section className="w-full md:w-[420px] bg-white flex flex-col border-l border-outline shadow-[-10px_0_30px_rgba(0,0,0,0.02)] fixed right-0 top-16 bottom-0 z-40">
-      {/* AI Header */}
+    <>
+      {/* Mobile Backdrop for AI Tutor overlay */}
+      {isOpen && (
+        <div 
+          onClick={onClose} 
+          className="fixed inset-0 bg-neutral-900/40 backdrop-blur-[1px] z-35 md:hidden"
+        />
+      )}
+
+      <section className={`w-full md:w-[420px] bg-white flex flex-col border-l border-outline shadow-[-10px_0_30px_rgba(0,0,0,0.02)] fixed right-0 top-16 bottom-0 z-40 transition-transform duration-300 ${
+        isOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'
+      }`}>
+        {/* AI Header */}
       <div className="p-4 border-b border-outline flex items-center justify-between bg-surface-dim/30">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-md bg-primary text-white flex items-center justify-center shadow-sm">
@@ -350,9 +363,19 @@ export default function AITutor({ messages, onSendMessage, progress, errorAnalys
             </div>
           </div>
         </div>
-        <button className="text-on-surface-variant hover:text-primary transition-colors">
-          <MoreVertical size={20} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button className="text-on-surface-variant hover:text-primary transition-colors p-1 rounded-lg">
+            <MoreVertical size={20} />
+          </button>
+          
+          <button 
+            onClick={onClose}
+            className="md:hidden text-on-surface-variant hover:text-primary transition-colors p-1.5 rounded-lg cursor-pointer"
+            title="Sohbeti Kapat"
+          >
+            <X size={20} />
+          </button>
+        </div>
       </div>
 
       {/* AI Chat Canvas */}
@@ -567,5 +590,6 @@ export default function AITutor({ messages, onSendMessage, progress, errorAnalys
         </div>
       )}
     </section>
-  );
+  </>
+);
 }

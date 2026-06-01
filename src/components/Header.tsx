@@ -10,9 +10,17 @@ import {
   X, 
   ChevronRight, 
   BookOpen,
-  Clock
+  Clock,
+  Menu,
+  Bot
 } from 'lucide-react';
 import { useFirebase } from './FirebaseContext';
+
+interface HeaderProps {
+  onToggleSidebar?: () => void;
+  onToggleAITutor?: () => void;
+  isAITutorOpen?: boolean;
+}
 
 interface HeaderResource {
   id: string;
@@ -66,7 +74,7 @@ const HARDCODED_TOPICS = [
   }
 ];
 
-export default function Header() {
+export default function Header({ onToggleSidebar, onToggleAITutor, isAITutorOpen }: HeaderProps) {
   const { user, signInWithGoogle } = useFirebase();
   const [name, setName] = useState('Deniz Yılmaz');
   const [avatarSeed, setAvatarSeed] = useState('Felix');
@@ -185,8 +193,15 @@ export default function Header() {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-outline z-50 px-6 flex items-center justify-between">
-      <div className="flex items-center gap-4">
+    <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-outline z-50 px-4 md:px-6 flex items-center justify-between">
+      <div className="flex items-center gap-2 md:gap-4">
+        <button 
+          onClick={onToggleSidebar}
+          className="p-1.5 rounded-lg text-primary hover:bg-surface-dim transition-colors md:hidden cursor-pointer mr-0.5"
+          title="Menüyü Aç"
+        >
+          <Menu size={20} />
+        </button>
         <span className="text-xl font-bold font-serif text-primary tracking-tight">EduAi</span>
         
         {/* Interactive Search Bar wrapper container */}
@@ -340,8 +355,19 @@ export default function Header() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-primary font-semibold bg-surface-dim border border-outline" title="Yerel Saat">
+      <div className="flex items-center gap-2 sm:gap-4">
+        {/* Mobile / Tablet AI Tutor Toggle Bubble */}
+        <button 
+          onClick={onToggleAITutor}
+          className="p-2 rounded-full hover:bg-slate-100 transition-colors text-primary cursor-pointer md:hidden relative flex items-center justify-center mr-0.5"
+          title="Mentor Sohbetini Aç/Kapat"
+        >
+          <Bot size={20} className={isAITutorOpen ? "text-primary animate-pulse" : "text-on-surface-variant"} />
+          <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-primary rounded-full animate-ping" />
+          <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-primary rounded-full" />
+        </button>
+
+        <div className="hidden xs:flex items-center gap-1.5 px-3 py-1.5 rounded-md text-primary font-semibold bg-surface-dim border border-outline" title="Yerel Saat">
           <Clock size={16} className="text-primary" />
           <span className="text-sm font-sans tracking-wide">{currentTime}</span>
         </div>

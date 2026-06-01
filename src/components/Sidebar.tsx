@@ -5,9 +5,11 @@ interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   onUploadClick: () => void;
+  isMobileOpen?: boolean;
+  onClose?: () => void;
 }
 
-export default function Sidebar({ activeTab, setActiveTab, onUploadClick }: SidebarProps) {
+export default function Sidebar({ activeTab, setActiveTab, onUploadClick, isMobileOpen, onClose }: SidebarProps) {
   const navItems = [
     { id: 'calisma', label: 'Çalışma Alanı', icon: BookOpen },
     { id: 'analiz', label: 'Konu Analizi', icon: TrendingUp },
@@ -15,8 +17,19 @@ export default function Sidebar({ activeTab, setActiveTab, onUploadClick }: Side
   ];
 
   return (
-    <aside className="w-64 fixed left-0 top-0 h-screen bg-surface border-r border-outline pt-20 hidden md:flex flex-col p-4 z-40">
-      <div className="mb-8 px-2">
+    <>
+      {/* Mobile Backdrop Overlay - closes sidebar on background click */}
+      {isMobileOpen && (
+        <div 
+          onClick={onClose} 
+          className="fixed inset-0 bg-neutral-900/40 backdrop-blur-[1px] z-35 md:hidden"
+        />
+      )}
+
+      <aside className={`w-64 fixed left-0 top-0 h-screen bg-surface border-r border-outline pt-20 flex flex-col p-4 z-40 transition-transform duration-300 ${
+        isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+      }`}>
+        <div className="mb-8 px-2">
         <h2 className="text-lg font-bold font-serif text-primary">Öğrenci Paneli</h2>
         <p className="text-xs text-on-surface-variant font-medium">LGS Matematik Modu</p>
       </div>
@@ -25,7 +38,10 @@ export default function Sidebar({ activeTab, setActiveTab, onUploadClick }: Side
         {navItems.map((item) => (
           <button
             key={item.id}
-            onClick={() => setActiveTab(item.id)}
+            onClick={() => {
+              setActiveTab(item.id);
+              onClose?.();
+            }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md transition-all ${
               activeTab === item.id
                 ? 'text-primary font-bold bg-surface-dim border-l-4 border-primary'
@@ -42,11 +58,14 @@ export default function Sidebar({ activeTab, setActiveTab, onUploadClick }: Side
         <motion.button
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
-          onClick={() => setActiveTab('ai-rehber')}
+          onClick={() => {
+            setActiveTab('ai-rehber');
+            onClose?.();
+          }}
           className={`w-full py-3 rounded-md font-bold text-sm shadow-sm flex items-center justify-center gap-2 transition-all ${
             activeTab === 'ai-rehber'
               ? 'bg-primary text-white scale-105'
-              : 'bg-primary text-white hover:bg-primary/90'
+              : 'bg-primary text-white hover:bg-primary/95'
           }`}
         >
           <Zap size={16} fill="currentColor" />
@@ -55,7 +74,10 @@ export default function Sidebar({ activeTab, setActiveTab, onUploadClick }: Side
 
         <div className="pt-4 border-t border-outline space-y-1">
           <button
-            onClick={() => setActiveTab('admin')}
+            onClick={() => {
+              setActiveTab('admin');
+              onClose?.();
+            }}
             className={`flex items-center gap-3 px-3 py-2 rounded-md transition-all w-full text-left ${
               activeTab === 'admin'
                 ? 'text-primary font-bold bg-surface-dim border-l-4 border-primary'
@@ -67,7 +89,10 @@ export default function Sidebar({ activeTab, setActiveTab, onUploadClick }: Side
           </button>
 
           <button
-            onClick={() => setActiveTab('ayarlar')}
+            onClick={() => {
+              setActiveTab('ayarlar');
+              onClose?.();
+            }}
             className={`flex items-center gap-3 px-3 py-2 rounded-md transition-all w-full text-left ${
               activeTab === 'ayarlar'
                 ? 'text-primary font-bold bg-surface-dim border-l-4 border-primary'
@@ -80,5 +105,6 @@ export default function Sidebar({ activeTab, setActiveTab, onUploadClick }: Side
         </div>
       </div>
     </aside>
-  );
+  </>
+);
 }

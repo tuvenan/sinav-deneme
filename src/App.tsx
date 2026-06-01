@@ -71,6 +71,8 @@ const INITIAL_QUESTIONS: Question[] = [
 
 export default function App() {
   const { user, loading: authLoading, signInWithGoogle } = useFirebase();
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isAITutorOpen, setIsAITutorOpen] = useState(false);
   const [showRegisterPromo, setShowRegisterPromo] = useState(() => {
     try {
       const dismissed = sessionStorage.getItem('lgs_dismiss_register_promo');
@@ -293,6 +295,8 @@ export default function App() {
         type: currentQuestion.errorType,
         suggestion: currentQuestion.errorAnalysis
       });
+      // Expand AI tutor pane on mobile to show the error analysis
+      setIsAITutorOpen(true);
       const aiResponse: Message = {
         id: Date.now().toString(),
         role: 'ai',
@@ -304,6 +308,8 @@ export default function App() {
   };
 
   const handleHint = () => {
+    // Expand tutor drawer on mobile to show the hint
+    setIsAITutorOpen(true);
     const hintMsg: Message = {
       id: Date.now().toString(),
       role: 'ai',
@@ -315,6 +321,8 @@ export default function App() {
   };
 
   const handleSendMessage = (text: string) => {
+    // Open tutor on mobile
+    setIsAITutorOpen(true);
     const userMsg: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -451,9 +459,19 @@ Kendi kelimelerinle yaptığın sesli kavram açıklamasını Google STT motoru 
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
-      <Header />
+      <Header 
+        onToggleSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
+        onToggleAITutor={() => setIsAITutorOpen(prev => !prev)}
+        isAITutorOpen={isAITutorOpen}
+      />
       <div className="flex pt-16 flex-1">
-        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onUploadClick={handleUploadClick} />
+        <Sidebar 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab} 
+          onUploadClick={handleUploadClick} 
+          isMobileOpen={isMobileSidebarOpen}
+          onClose={() => setIsMobileSidebarOpen(false)}
+        />
         <main className="flex-1 md:ml-64 mr-0 md:mr-[420px] bg-background">
           {activeTab === 'calisma' && (
             <QuestionArea
@@ -492,6 +510,8 @@ Kendi kelimelerinle yaptığın sesli kavram açıklamasını Google STT motoru 
           onSendMessage={handleSendMessage}
           progress={progress}
           errorAnalysis={lastErrorAnalysis}
+          isOpen={isAITutorOpen}
+          onClose={() => setIsAITutorOpen(false)}
         />
       </div>
 
