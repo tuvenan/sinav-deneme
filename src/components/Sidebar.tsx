@@ -54,24 +54,7 @@ export default function Sidebar({ activeTab, setActiveTab, onUploadClick, isMobi
         ))}
       </nav>
 
-      <div className="mt-auto space-y-4">
-        <motion.button
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.99 }}
-          onClick={() => {
-            setActiveTab('ai-rehber');
-            onClose?.();
-          }}
-          className={`w-full py-3 rounded-md font-bold text-sm shadow-sm flex items-center justify-center gap-2 transition-all ${
-            activeTab === 'ai-rehber'
-              ? 'bg-primary text-white scale-105'
-              : 'bg-primary text-white hover:bg-primary/95'
-          }`}
-        >
-          <Zap size={16} fill="currentColor" />
-          AI Rehberine Sor
-        </motion.button>
-
+      <div className="mt-auto">
         <div className="pt-4 border-t border-outline space-y-1">
           <button
             onClick={() => {

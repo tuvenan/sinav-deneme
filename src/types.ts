@@ -17,6 +17,9 @@ export interface Question {
   errorAnalysis: string;
   errorType: string;
   imageUrl?: string;
+  subject: string;
+  unit: string;
+  topic: string;
 }
 
 export interface SolveHistory {

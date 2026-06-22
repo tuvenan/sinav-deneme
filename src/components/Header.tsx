@@ -18,8 +18,6 @@ import { useFirebase } from './FirebaseContext';
 
 interface HeaderProps {
   onToggleSidebar?: () => void;
-  onToggleAITutor?: () => void;
-  isAITutorOpen?: boolean;
 }
 
 interface HeaderResource {
@@ -51,30 +49,7 @@ const HARDCODED_QUESTIONS = [
   }
 ];
 
-const HARDCODED_TOPICS = [
-  {
-    topic: "Üslü Sayılar",
-    desc: "Formüller, negatif üs ve üssün üssü kavramları",
-    prompt: "LGS Üslü Sayılar konusuyla ilgili bana 10 adet kritik kural ve sınav tüyosu yazar mısın?"
-  },
-  {
-    topic: "Kareköklü İfadeler",
-    desc: "Tam kare ilişkisi, karekök tahminleme kuralları",
-    prompt: "Kareköklü ifadelerde kök dışına çıkarma ve katsayıyı içeri alma pratik yollarını anlatır mısın?"
-  },
-  {
-    topic: "Çarpanlar ve Katlar",
-    desc: "EBOB - EKOK formülleri, asal çarpanlar analizleri",
-    prompt: "EBOB EKOK problemlerindeki ipucu kelimeleri nelerdir? Nasıl kolayca ayırt ederiz?"
-  },
-  {
-    topic: "Cebirsel İfadeler ve Özdeşlikler",
-    desc: "Çok karıştırılan Cebirsel İfadeler ve geometrik ispatlar",
-    prompt: "Çok karıştırılan LGS Cebirsel İfadeler ve Özdeşlikler formüllerini en sade dille açıklar mısın?"
-  }
-];
-
-export default function Header({ onToggleSidebar, onToggleAITutor, isAITutorOpen }: HeaderProps) {
+export default function Header({ onToggleSidebar }: HeaderProps) {
   const { user, signInWithGoogle } = useFirebase();
   const [name, setName] = useState('Deniz Yılmaz');
   const [avatarSeed, setAvatarSeed] = useState('Felix');
@@ -160,11 +135,7 @@ export default function Header({ onToggleSidebar, onToggleAITutor, isAITutorOpen
     ? getResources().filter(r => r.name.toLocaleLowerCase('tr-TR').includes(query) || r.topic.toLocaleLowerCase('tr-TR').includes(query))
     : [];
 
-  const matchedTopics = query 
-    ? HARDCODED_TOPICS.filter(t => t.topic.toLocaleLowerCase('tr-TR').includes(query) || t.desc.toLocaleLowerCase('tr-TR').includes(query))
-    : [];
-
-  const hasResults = matchedQuestions.length > 0 || matchedResources.length > 0 || matchedTopics.length > 0;
+  const hasResults = matchedQuestions.length > 0 || matchedResources.length > 0;
 
   // Handle selections
   const selectQuestion = (id: string) => {
@@ -179,17 +150,8 @@ export default function Header({ onToggleSidebar, onToggleAITutor, isAITutorOpen
     setShowResults(false);
   };
 
-  const selectTopicPrompt = (prompt: string) => {
-    window.dispatchEvent(new CustomEvent('ask_ai_mentor', { detail: { prompt } }));
-    setSearchQuery('');
-    setShowResults(false);
-  };
-
-  const handleAskAIWithSearch = (e: React.FormEvent) => {
+  const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      selectTopicPrompt(`"${searchQuery.trim()}" konusu/sorusu hakkında kafam karışık, bana detaylıca bu başlığı anlatıp LGS tüyoları verir misin?`);
-    }
   };
 
   return (
@@ -202,12 +164,12 @@ export default function Header({ onToggleSidebar, onToggleAITutor, isAITutorOpen
         >
           <Menu size={20} />
         </button>
-        <span className="text-xl font-bold font-serif text-primary tracking-tight">EduAi</span>
+        <span className="text-xl font-bold font-serif text-primary tracking-tight">EduSınav</span>
         
         {/* Interactive Search Bar wrapper container */}
         <div ref={containerRef} className="hidden md:block relative">
           <form 
-            onSubmit={handleAskAIWithSearch}
+            onSubmit={handleSearchSubmit}
             className="flex items-center bg-surface-dim px-3 py-1.5 rounded-md border border-outline w-72 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all"
           >
             <Search size={16} className="text-on-surface-variant flex-shrink-0" />
@@ -219,7 +181,7 @@ export default function Header({ onToggleSidebar, onToggleAITutor, isAITutorOpen
                 setShowResults(true);
               }}
               onFocus={() => setShowResults(true)}
-              placeholder="Konu veya soru ara..."
+              placeholder="Soru veya kaynak ara..."
               className="bg-transparent border-none focus:outline-none focus:ring-0 text-sm ml-2 w-full placeholder:text-on-surface-variant/60 text-on-surface"
             />
             {searchQuery && (
@@ -304,41 +266,10 @@ export default function Header({ onToggleSidebar, onToggleAITutor, isAITutorOpen
                   </div>
                 )}
 
-                {/* 3. Category Math Topics (AI Action) */}
-                {matchedTopics.length > 0 && (
-                  <div className="space-y-1">
-                    <span className="text-[9px] font-bold text-primary tracking-wider uppercase px-2 font-mono">Yapay Zeka Çalışma Konuları</span>
-                    <div className="space-y-0.5">
-                      {matchedTopics.map(mt => (
-                        <button
-                          key={mt.topic}
-                          onClick={() => selectTopicPrompt(mt.prompt)}
-                          className="w-full text-left p-2 hover:bg-surface-dim rounded-lg flex items-start gap-2.5 transition-colors cursor-pointer group"
-                        >
-                          <Sparkles size={14} className="text-purple-600 mt-0.5 shrink-0 animate-pulse" />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-bold text-primary group-hover:text-primary/80">LGS {mt.topic} Analiz</p>
-                            <p className="text-[10px] text-on-surface-variant">{mt.desc}</p>
-                          </div>
-                          <span className="text-[8px] bg-purple-50 text-purple-600 font-bold px-1.5 py-0.5 rounded uppercase self-start">AI Sor</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 {/* 4. Fallback search when no category has entries */}
                 {!hasResults && (
                   <div className="p-4 text-center space-y-3">
                     <p className="text-xs font-medium text-on-surface-variant">"{searchQuery}" aramasıyla eşleşen yerel veri bulunamadı.</p>
-                    <button
-                      onClick={handleAskAIWithSearch}
-                      type="button"
-                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary/10 text-primary hover:bg-primary/20 text-xs font-bold uppercase tracking-widest rounded-lg transition-all cursor-pointer"
-                    >
-                      <Sparkles size={13} className="animate-pulse" />
-                      Yapay Zekaya Doğrudan Sor
-                    </button>
                   </div>
                 )}
 
@@ -346,8 +277,8 @@ export default function Header({ onToggleSidebar, onToggleAITutor, isAITutorOpen
 
               {/* Bottom Quick Tips */}
               <div className="px-4 py-2 bg-surface-dim border-t border-outline text-[9px] text-on-surface-variant/80 flex items-center justify-between">
-                <span>Sorular, ders özetleri veya videolar arasında canlı arar.</span>
-                <span className="font-bold text-primary italic">EduAi</span>
+                <span>Sorular ve ders kaynakları arasında canlı arar.</span>
+                <span className="font-bold text-primary italic">EduSınav</span>
               </div>
 
             </div>
@@ -356,17 +287,6 @@ export default function Header({ onToggleSidebar, onToggleAITutor, isAITutorOpen
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4">
-        {/* Mobile / Tablet AI Tutor Toggle Bubble */}
-        <button 
-          onClick={onToggleAITutor}
-          className="p-2 rounded-full hover:bg-slate-100 transition-colors text-primary cursor-pointer md:hidden relative flex items-center justify-center mr-0.5"
-          title="Mentor Sohbetini Aç/Kapat"
-        >
-          <Bot size={20} className={isAITutorOpen ? "text-primary animate-pulse" : "text-on-surface-variant"} />
-          <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-primary rounded-full animate-ping" />
-          <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-primary rounded-full" />
-        </button>
-
         <div className="hidden xs:flex items-center gap-1.5 px-3 py-1.5 rounded-md text-primary font-semibold bg-surface-dim border border-outline" title="Yerel Saat">
           <Clock size={16} className="text-primary" />
           <span className="text-sm font-sans tracking-wide">{currentTime}</span>
@@ -392,13 +312,13 @@ export default function Header({ onToggleSidebar, onToggleAITutor, isAITutorOpen
           <button 
             onClick={() => signInWithGoogle().then(u => {
               if (u) {
-                alert(`Hoş geldin LGS Şampiyonu, ${u.displayName}! Bulut yedekleme aktifleşti.`);
+                alert(`Hoş geldin LGS Şampiyonu, ${u.displayName}! Giriş başarılı.`);
               }
             })}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-primary to-primary-hover hover:from-primary-hover hover:to-primary text-white rounded-lg text-xs font-black uppercase tracking-wider cursor-pointer shadow-sm hover:shadow-md transition-all truncate"
           >
             <Sparkles size={11} className="shrink-0 animate-pulse text-yellow-300" />
-            <span className="hidden xs:inline">Google ile Eşle</span>
+            <span className="hidden xs:inline">Google ile Giriş Yap</span>
             <span className="inline xs:hidden">Giriş Yap</span>
           </button>
         )}

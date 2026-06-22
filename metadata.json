@@ -1,6 +1,6 @@
 {
   "name": "EduAi",
-  "description": "Yapay zeka destekli LGS hazırlık platformu. Kişiselleştirilmiş matematik çalışma alanı ve anlık mentorluk desteği.",
-  "requestFramePermissions": ["microphone"],
+  "description": "LGS hazırlık platformu. Ders, ünite ve konu bazlı soru bankalarından oluşan test çözme sitesi.",
+  "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -7,16 +7,52 @@ import { useState, useCallback, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import QuestionArea from './components/QuestionArea';
-import AITutor from './components/AITutor';
 import AnalysisView from './components/AnalysisView';
 import ResourcesView from './components/ResourcesView';
 import SettingsView from './components/SettingsView';
-import AIGuideView from './components/AIGuideView';
 import AdminView from './components/AdminView';
 import type { Question, Message, Difficulty, SolveHistory } from './types';
 import { useFirebase } from './components/FirebaseContext';
 import { getOrCreateUserProfile, getSolveHistories, addSolveHistory } from './lib/db';
 import { Sparkles, ShieldCheck, CloudLightning, BookOpen } from 'lucide-react';
+import { generateLGSQuestions, LGS_SYLLABUS, buildQuestion } from './utils/questionGenerator';
+
+function synchronizeQuestionsWithSyllabus(currentQuestions: Question[], currentSyllabus: typeof LGS_SYLLABUS): Question[] {
+  const activeCombinations = currentSyllabus.filter(s => s.subject && s.unit && s.topic);
+  
+  // Keep questions that still match an active syllabus combination
+  let updatedPool = currentQuestions.filter(q => {
+    return activeCombinations.some(item => 
+      q.subject === item.subject && 
+      q.unit === item.unit && 
+      q.topic === item.topic
+    );
+  });
+
+  // Find combinations in the syllabus that currently have 0 questions
+  for (const item of activeCombinations) {
+    const hasQs = updatedPool.some(q => 
+      q.subject === item.subject && 
+      q.unit === item.unit && 
+      q.topic === item.topic
+    );
+
+    if (!hasQs) {
+      // Automatically generate 20 questions for this mismatch/new combination
+      for (let i = 1; i <= 20; i++) {
+        const difficulty: Difficulty = i <= 6 ? 'Kolay' : i <= 14 ? 'Orta' : 'Zor';
+        const subjectPrefix = (item.subject || 'GEN').substring(0, 3).toUpperCase();
+        const topicSuffix = (item.topic || 'TOP').replace(/\s+/g, '').substring(0, 5).toUpperCase();
+        const qId = `AUTO-${subjectPrefix}-${topicSuffix}-${100 + i}`;
+        
+        const q = buildQuestion(item.subject, item.unit, item.topic, i, difficulty, qId);
+        updatedPool.push(q);
+      }
+    }
+  }
+
+  return updatedPool;
+}
 
 const INITIAL_QUESTIONS: Question[] = [
   {
@@ -33,7 +69,10 @@ const INITIAL_QUESTIONS: Question[] = [
     ],
     hint: "25 sayısını 5'in kuvveti olarak (5²) ve 16 sayısını 2'nin kuvveti olarak (2⁴) yazıp üsleri birleştirmeyi dene.",
     errorAnalysis: "Muhtemelen toplama yaparken üsleri birleştirmek yerine doğrudan sayıları toplamaya çalıştın. Üslü sayılarda çarpma kuralını (tabanlar aynıysa üsler toplanır) kontrol etmelisin.",
-    errorType: "Kural Karışıklığı"
+    errorType: "Kural Karışıklığı",
+    subject: "Matematik",
+    unit: "Üslü İfadeler",
+    topic: "Üslü Sayılarda Çarpma"
   },
   {
     id: "87",
@@ -49,7 +88,10 @@ const INITIAL_QUESTIONS: Question[] = [
     ],
     hint: "1,5 · 10⁸ sayısını 3 · 10⁵ sayısına bölerken katsayıları kendi arasında, üslüleri kendi arasında böl.",
     errorAnalysis: "Bölme işleminde üsleri çıkarırken hata yapmış olabilirsin. 10⁸ / 10⁵ = 10³ olduğunu unutma.",
-    errorType: "İşlem Hatası"
+    errorType: "İşlem Hatası",
+    subject: "Matematik",
+    unit: "Üslü İfadeler",
+    topic: "Bilimsel Gösterim"
   },
   {
     id: "12",
@@ -65,14 +107,73 @@ const INITIAL_QUESTIONS: Question[] = [
     ],
     hint: "Tabanlar her iki ifadede de 2. Üsleri (3 ve 5) toplaman yeterli olacaktır.",
     errorAnalysis: "Üsleri toplamak yerine çarpmış olabilirsin (3x5=15). Temel kuralları tekrar gözden geçirelim.",
-    errorType: "Temel Bilgi Eksiği"
+    errorType: "Temel Bilgi Eksiği",
+    subject: "Matematik",
+    unit: "Üslü İfadeler",
+    topic: "Üslü Sayılarda Çarpma"
+  },
+  {
+    id: "101",
+    difficulty: "Kolay",
+    text: "Aşağıdaki cümlelerin hangisinde 'keskin' sözcüğü mecaz anlamda kullanılmıştır?",
+    context: '"Bir sözcüğün gerçek anlamından tamamen uzaklaşarak kazandığı yeni anlama mecaz anlam denir."',
+    query: "Buna göre cümleleri inceleyerek mecaz anlamlı seceneği bulunuz.",
+    options: [
+      { label: "A", value: "Masanın üzerindeki keskin bıçağı kaldır.", isCorrect: false },
+      { label: "B", value: "Onun bu keskin zekası herkesi hayran bıraktı.", isCorrect: true },
+      { label: "C", value: "Biberin çok keskin bir kokusu vardı.", isCorrect: false },
+      { label: "D", value: "Ayağına batan keskin taşı hemen fırlattı.", isCorrect: false }
+    ],
+    hint: "'Keskin' sözcüğü normalde kesici aletler için kullanılır. Zeka veya koku ile kullanıldığında bu özellik gerçek dışıdır.",
+    errorAnalysis: "Gerçek anlamda dokunma veya görme duyularıyla hissedilen fiziki kesicilik kastedilir. Zeka fiziki olarak kesici olamayacağı için mecazdır.",
+    errorType: "Sözcük Grubu Karışıklığı",
+    subject: "Türkçe",
+    unit: "Sözcükte Anlam",
+    topic: "Gerçek ve Mecaz Anlam"
+  },
+  {
+    id: "202",
+    difficulty: "Orta",
+    text: "Eğiklik açısı 23° 27' olan Dünya'nın eksen eğikliği ve Güneş etrafındaki dolanma hareketi sonucu mevsimler oluşur.",
+    context: '"21 Haziran tarihinde Kuzey Yarım Küre\'de yaz mevsimi başlangıcı yaşanırken Güney Yarım Küre\'de ise kış mevsimi başlar."',
+    query: "Buna göre en uzun gündüzün Kuzey Yarım Küre'de yaşandığı tarih aşağıdakilerden hangisidir?",
+    options: [
+      { label: "A", value: "21 Mart", isCorrect: false },
+      { label: "B", value: "21 Haziran", isCorrect: true },
+      { label: "C", value: "23 Eylül", isCorrect: false },
+      { label: "D", value: "21 Aralık", isCorrect: false }
+    ],
+    hint: "Yaz mevsiminin başladığı ve güneş ışınlarının en dik geldiği gün en uzun gündüz yaşanır.",
+    errorAnalysis: "En uzun gündüzün Kuzey Yarım Küre için 21 Haziran (Yaz Gündönümü) olduğunu unutmuş olabilirsiniz.",
+    errorType: "Bilgi Eksiği",
+    subject: "Fen Bilimleri",
+    unit: "Mevsimler ve İklim",
+    topic: "Mevsimlerin Oluşumu"
+  },
+  {
+    id: "303",
+    difficulty: "Orta",
+    text: "Bir limandan kalkan iki farklı gemiden biri 12 saatte bir, diğeri ise 15 saatte bir sefer yapmaktadır.",
+    context: '"İki gemi aynı anda sefer çıktıktan sonra tekrar ilk kez birlikte çıkacakları zaman hesaplanacaktır."',
+    query: "Buna göre bu iki gemi en az kaç saat sonra tekrar birlikte sefere çıkarlar?",
+    options: [
+      { label: "A", value: "3", isCorrect: false },
+      { label: "B", value: "30", isCorrect: false },
+      { label: "C", value: "60", isCorrect: true },
+      { label: "D", value: "120", isCorrect: false }
+    ],
+    hint: "12 ve 15 sayılarının en küçük ortak katını (EKOK) bulmalısın.",
+    errorAnalysis: "Bu soruda bütüne gitmek istendiği için EKOK alınmalıdır. En küçük ortak katı 60'tır.",
+    errorType: "EBOB / EKOK Karışıklığı",
+    subject: "Matematik",
+    unit: "Çarpanlar ve Katlar",
+    topic: "EBOB - EKOK Problemleri"
   }
 ];
 
 export default function App() {
   const { user, loading: authLoading, signInWithGoogle } = useFirebase();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [isAITutorOpen, setIsAITutorOpen] = useState(false);
   const [showRegisterPromo, setShowRegisterPromo] = useState(() => {
     try {
       const dismissed = sessionStorage.getItem('lgs_dismiss_register_promo');
@@ -107,7 +208,6 @@ export default function App() {
           console.error('Failed to parse dynamic theme configuration:', err);
         }
       } else {
-        // Reset to default variable states just in case
         const root = document.documentElement;
         root.style.removeProperty('--color-primary');
         root.style.removeProperty('--color-accent');
@@ -129,47 +229,67 @@ export default function App() {
     };
   }, []);
 
-  const [questions, setQuestions] = useState<Question[]>(() => {
-    const saved = localStorage.getItem('lgs_questions_pool');
+  const [syllabus, setSyllabus] = useState<{ subject: string; unit: string; topic: string }[]>(() => {
+    const saved = localStorage.getItem('lgs_custom_syllabus') || localStorage.getItem('lgs_published_syllabus');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return LGS_SYLLABUS;
+  });
+
+  const [questions, setQuestions] = useState<Question[]>(() => {
+    // 1. Get current active syllabus
+    const savedSyllabusStr = localStorage.getItem('lgs_custom_syllabus') || localStorage.getItem('lgs_published_syllabus');
+    let activeSyllabus = LGS_SYLLABUS;
+    if (savedSyllabusStr) {
+      try {
+        const parsed = JSON.parse(savedSyllabusStr);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          activeSyllabus = parsed;
+        }
+      } catch (e) {}
+    }
+
+    // 2. Try loading from lgs_questions_pool first, as it holds all edited/published/injected/created questions
+    let pool: Question[] = [];
+    const savedPool = localStorage.getItem('lgs_questions_pool');
+    if (savedPool) {
+      try {
+        const parsed = JSON.parse(savedPool);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          pool = parsed;
         }
       } catch (e) {
         console.error('Failed to parse lgs_questions_pool:', e);
       }
     }
-    // Seed localStorage if empty
-    localStorage.setItem('lgs_questions_pool', JSON.stringify(INITIAL_QUESTIONS));
-    return INITIAL_QUESTIONS;
+
+    if (pool.length === 0) {
+      pool = generateLGSQuestions();
+    }
+
+    // 3. Synchronize questions pool with current active syllabus configurations
+    const synchronized = synchronizeQuestionsWithSyllabus(pool, activeSyllabus);
+    localStorage.setItem('lgs_questions_pool', JSON.stringify(synchronized));
+    return synchronized;
   });
 
   const [currentQuestion, setCurrentQuestion] = useState<Question>(() => {
-    const saved = localStorage.getItem('lgs_questions_pool');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed[0];
-        }
-      } catch (e) {}
-    }
-    return INITIAL_QUESTIONS[0];
+    return questions[0] || INITIAL_QUESTIONS[0];
   });
+
   const [difficulty, setDifficulty] = useState<Difficulty>('Hepsi');
   const [correctStreak, setCorrectStreak] = useState(0);
   const [progress, setProgress] = useState(60);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      role: 'ai',
-      text: 'Merhaba! Ben senin LGS Matematik mentorun. Üslü sayılar konusunda bugün harika ilerleme kaydediyorsun. Çözemediğin her adımda yanındayım.',
-      timestamp: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
-    }
-  ]);
-  const [lastErrorAnalysis, setLastErrorAnalysis] = useState<{ type: string; suggestion: string } | undefined>();
+
+  // Lesson, Unit, Topic Cascade Filters
+  const [selectedSubject, setSelectedSubject] = useState<string>('Hepsi');
+  const [selectedUnit, setSelectedUnit] = useState<string>('Hepsi');
+  const [selectedTopic, setSelectedTopic] = useState<string>('Hepsi');
+
   const [solveHistory, setSolveHistory] = useState<SolveHistory[]>(() => {
     const saved = localStorage.getItem('lgs_solve_history');
     if (saved) {
@@ -183,6 +303,15 @@ export default function App() {
       { questionId: "87", isCorrect: false, timeSpent: 125, difficulty: "Zor" }
     ];
   });
+
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      role: 'ai',
+      text: 'EduSınav Soru Bankası ve Test Çözme sistemine hoş geldiniz.',
+      timestamp: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+    }
+  ]);
 
   useEffect(() => {
     localStorage.setItem('lgs_solve_history', JSON.stringify(solveHistory));
@@ -228,29 +357,109 @@ export default function App() {
     syncUserData();
   }, [user]);
 
+  // Auto-switch to first question when filters change to start at question 1, and sanitize selected variables
+  useEffect(() => {
+    let activeSubject = selectedSubject;
+    let activeUnit = selectedUnit;
+    let activeTopic = selectedTopic;
+
+    // Check if selectedSubject is still valid in syllabus
+    if (selectedSubject !== 'Hepsi') {
+      const exists = syllabus.some(s => s.subject === selectedSubject);
+      if (!exists) {
+        activeSubject = 'Hepsi';
+        activeUnit = 'Hepsi';
+        activeTopic = 'Hepsi';
+        setSelectedSubject('Hepsi');
+        setSelectedUnit('Hepsi');
+        setSelectedTopic('Hepsi');
+      }
+    }
+
+    if (activeSubject !== 'Hepsi' && activeUnit !== 'Hepsi') {
+      const exists = syllabus.some(s => s.subject === activeSubject && s.unit === activeUnit);
+      if (!exists) {
+        activeUnit = 'Hepsi';
+        activeTopic = 'Hepsi';
+        setSelectedUnit('Hepsi');
+        setSelectedTopic('Hepsi');
+      }
+    }
+
+    if (activeSubject !== 'Hepsi' && activeUnit !== 'Hepsi' && activeTopic !== 'Hepsi') {
+      const exists = syllabus.some(s => s.subject === activeSubject && s.unit === activeUnit && s.topic === activeTopic);
+      if (!exists) {
+        activeTopic = 'Hepsi';
+        setSelectedTopic('Hepsi');
+      }
+    }
+
+    let pool = questions;
+    if (difficulty !== 'Hepsi') {
+      pool = pool.filter(q => q.difficulty === difficulty);
+    }
+    if (activeSubject !== 'Hepsi') {
+      pool = pool.filter(q => q.subject === activeSubject);
+    }
+    if (activeUnit !== 'Hepsi') {
+      pool = pool.filter(q => q.unit === activeUnit);
+    }
+    if (activeTopic !== 'Hepsi') {
+      pool = pool.filter(q => q.topic === activeTopic);
+    }
+    
+    if (pool.length > 0) {
+      setCurrentQuestion(pool[0]);
+    }
+  }, [selectedSubject, selectedUnit, selectedTopic, difficulty, questions, syllabus]);
+
   const loadNewQuestion = useCallback(() => {
     setCurrentQuestion(prev => {
       let pool = questions;
-      if (difficulty !== 'Hepsi') {
-        pool = questions.filter(q => q.difficulty === difficulty);
-      }
-      if (pool.length === 0) pool = questions;
       
-      let finalPool = pool;
+      // Apply difficulty filter
+      if (difficulty !== 'Hepsi') {
+        pool = pool.filter(q => q.difficulty === difficulty);
+      }
+      // Apply Subject Cascade Filter
+      if (selectedSubject !== 'Hepsi') {
+        pool = pool.filter(q => q.subject === selectedSubject);
+      }
+      // Apply Unit Cascade Filter
+      if (selectedUnit !== 'Hepsi') {
+        pool = pool.filter(q => q.unit === selectedUnit);
+      }
+      // Apply Topic Cascade Filter
+      if (selectedTopic !== 'Hepsi') {
+        pool = pool.filter(q => q.topic === selectedTopic);
+      }
+      
+      if (pool.length === 0) {
+        // Fallback to active subject if possible to avoid empty screens
+        let fallbackPool = questions;
+        if (selectedSubject !== 'Hepsi') {
+          fallbackPool = fallbackPool.filter(q => q.subject === selectedSubject);
+        }
+        pool = fallbackPool.length > 0 ? fallbackPool : questions;
+      }
+      
+      let nextIndex = 0;
       if (prev) {
-        finalPool = pool.filter(q => q.id !== prev.id);
-        if (finalPool.length === 0) {
-          finalPool = pool;
+        const idx = pool.findIndex(q => q.id === prev.id);
+        if (idx !== -1 && idx + 1 < pool.length) {
+          nextIndex = idx + 1;
+        } else {
+          nextIndex = 0; // Wraps around once the bank is fully completed
         }
       }
       
-      const random = Math.floor(Math.random() * finalPool.length);
-      return finalPool[random];
+      return pool[nextIndex] || questions[0];
     });
-    setLastErrorAnalysis(undefined);
-  }, [questions, difficulty]);
+  }, [questions, difficulty, selectedSubject, selectedUnit, selectedTopic]);
 
   const handleAnswer = (isCorrect: boolean, timeSpentSeconds: number) => {
+    if (!currentQuestion) return;
+    
     // Save to solve history
     const newSolve: SolveHistory = {
       questionId: currentQuestion.id,
@@ -266,147 +475,12 @@ export default function App() {
       });
     }
 
-    const formattedTime = timeSpentSeconds > 59 
-      ? `${Math.floor(timeSpentSeconds / 60)} dk ${timeSpentSeconds % 60} sn` 
-      : `${timeSpentSeconds} saniye`;
-
-    let feedbackTimeText = '';
-    if (timeSpentSeconds < 30) {
-      feedbackTimeText = ` Bu soruyu sadece ${formattedTime} içerisinde rekor bir hızla çözdün! LGS'de zaman yönetimi açısından mükemmel durumdasın.`;
-    } else if (timeSpentSeconds > 90) {
-      feedbackTimeText = ` Bu soru üstünde ${formattedTime} harcadın. Sabırla ve odaklanarak sonuna kadar gitmen harika!`;
-    } else {
-      feedbackTimeText = ` ${formattedTime} çözüm süresi LGS standartlarına göre oldukça dengeli!`;
-    }
-
     if (isCorrect) {
       setCorrectStreak(prev => prev + 1);
       setProgress(prev => Math.min(100, prev + 5));
-      const aiResponse: Message = {
-        id: Date.now().toString(),
-        role: 'ai',
-        text: `Harika bir çözüm! Mantığı çok iyi kavradın.${feedbackTimeText} Bir sonraki soruya geçmeye hazır mısın?`,
-        timestamp: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
-      };
-      setMessages(prev => [...prev, aiResponse]);
     } else {
       setCorrectStreak(0);
-      setLastErrorAnalysis({
-        type: currentQuestion.errorType,
-        suggestion: currentQuestion.errorAnalysis
-      });
-      // Expand AI tutor pane on mobile to show the error analysis
-      setIsAITutorOpen(true);
-      const aiResponse: Message = {
-        id: Date.now().toString(),
-        role: 'ai',
-        text: `Yanlış cevap verdin ama sorun değil. Çözüm sürecinde ${formattedTime} harcadın.${feedbackTimeText} Senin için detaylı bir hata analizi hazırladım. "${currentQuestion.errorType}" kısmına dikkat ederek tekrar deneyelim.`,
-        timestamp: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
-      };
-      setMessages(prev => [...prev, aiResponse]);
     }
-  };
-
-  const handleHint = () => {
-    // Expand tutor drawer on mobile to show the hint
-    setIsAITutorOpen(true);
-    const hintMsg: Message = {
-      id: Date.now().toString(),
-      role: 'ai',
-      text: currentQuestion.hint,
-      timestamp: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
-      isHint: true
-    };
-    setMessages(prev => [...prev, hintMsg]);
-  };
-
-  const handleSendMessage = (text: string) => {
-    // Open tutor on mobile
-    setIsAITutorOpen(true);
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      text,
-      timestamp: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
-    };
-    setMessages(prev => [...prev, userMsg]);
-
-    // Check if this is a speech-to-text concept explanation response
-    const isVoiceAnalysis = text.includes('[Zor Kavram Açıklama Analizi]');
-    const lowerText = text.toLowerCase();
-
-    // Simulated AI response
-    setTimeout(() => {
-      let responseText = 'Güzel bir soru! Bu adımda tabanların aynı olduğuna dikkat etmelisin. Eğer tabanlar aynıysa üsleri toplaman yeterli olacaktır.';
-
-      if (isVoiceAnalysis) {
-        if (lowerText.includes('üs') && lowerText.includes('çarpma') && (lowerText.includes('çarp') || lowerText.includes('on beş') || lowerText.includes('onbeş'))) {
-          responseText = `🎙️ **Ses Kaydı Analizi Yapıldı (Kural Hatası Tespit Edildi!)**
-
-Merhaba! Harika bir çaba, kavramları kendi sesinle açıklaman kalıcı öğrenmenin 1 numaralı sırrıdır! Ancak açıklamanda LGS denemelerinde çok can yakan bir kaza tespit ettim:
-
-❌ **Yanılgı:** "Tabanlar aynıyken üsleri kendi arasında çarparız" dedin ve ve $2^3 \\cdot 2^5 = 2^{15}$ örneğini verdin.
-
-✅ **Gerçek Kural:** Üslü sayılarda çarpma işleminde tabanlar aynı ise **üsler toplanır!** Yani çarpma işleminde üsleri çarpmayız, toplarız:
-$$2^3 \\cdot 2^5 = 2^{(3+5)} = 2^8$$
-
-**Mentor Önerisi:** Üsler ancak "üssün üssü" alınırken çarpılır (Örn: $(2^3)^5 = 2^{15}$). Çarpma kuralı ile Üssün Üssü kuralını birbiriyle karıştırmamak için bu akşam soru defterine 3 adet çarpma örneği yazıp çözmeni öneririm!`;
-        } else if (lowerText.includes('kök') && lowerText.includes('toplama') && (lowerText.includes('kök iç') || lowerText.includes('sekiz') || lowerText.includes('kök sekiz'))) {
-          responseText = `🎙️ **Ses Kaydı Analizi Yapıldı (Temel Bilgi Hatası Tespit Edildi!)**
-
-Ses kaydıyla kavram anlatımı yapman harika bir çalışma! Ancak LGS Matematik sınavlarında öğrencilerin %80'inin düştüğü klasik bir köklü sayı tuzağına düştün:
-
-❌ **Yanılgı:** "Köklü sayılarda toplama yaparken kök içlerindeki sayıları toplayabiliriz" dedin ve $\\sqrt{3} + \\sqrt{5} = \\sqrt{8}$ dedin.
-
-✅ **Gerçek Kural:** Köklü sayılarda toplama veya çıkarma yapabilmek için **kök içlerinin kesinlikle aynı olması gerekir!** Kök içleri aynı değilse işlem aynen kalır, toplanıp tek kök içine yazılamaz:
-$$\\sqrt{3} + \\sqrt{5} \\text{ ifadesi daha fazla sadeleşemez.}$$
-
-Ancak kök içleri aynıysa katsayılar toplanır:
-$$2\\sqrt{3} + 5\\sqrt{3} = 7\\sqrt{3}$$
-
-**Mentor Önerisi:** Köklü sayıları elmalarla karıştırma! Aynı tür elmalar toplanır ama armut ile elma toplanmaz. Tam kare olmayan sayıları kök dışına çıkarma konusunu bu akşam tekrar gözden geçir!`;
-        } else if (lowerText.includes('ebob') && lowerText.includes('ekok') && (lowerText.includes('küçük') || lowerText.includes('bir araya') || lowerText.includes('bina'))) {
-          responseText = `🎙️ **Ses Kaydı Analizi Yapıldı (EBOB/EKOK Karışıklığı Tespit Edildi!)**
-
-Kendi kendine sesli açıklama yaparak öğrenmeni test etmen mükemmel bir alışkanlık! Fakat EBOB ile EKOK formüllerinin kullanım yerlerini birbiriyle tam tersi karıştırıyorsun:
-
-❌ **Yanılgı:** "Küçük parçaları bir araya getirip büyük bir bütün oluştururken EBOB kullanılır" dedin.
-
-✅ **Gerçek Kural:**
-- **EKOK (En Küçük Ortak Kat):** Küçük parçalar (Örn: tuğlalar, cevizler, saat zilleri, küçük fayanslar) bir araya getirilip daha **büyük bir bütün/kat** oluşturuluyorsa (Parçadan Bütüne) kullanılır. Katlar her zaman büyür.
-- **EBOB (En Büyük Ortak Bölen):** Büyük bir bütün (Örn: tarla etrafı, bidsondaki yağlar, büyük kumaşlar) **küçük eşit parçalara** bölünüyorsa (Bütünden Parçaya) kullanılır. Bölenler her zaman küçültür.
-
-**Mentor Önerisi:** Bu pratik formülü aklında tut: "Bütünden parçaya gidiyorsan Bölen (EBOB), parçadan bütüne çıkıyorsan Kat (EKOK)!" Bir sonraki matematik sorusunda bu kuralı doğrudan uygula!`;
-        } else {
-          responseText = `🎙️ **Ses Kaydı Analizi Yapıldı (Genel Değerlendirme)**
-
-Kendi kelimelerinle yaptığın sesli kavram açıklamasını Google STT motoru üzerinden dinledim! Ses tonundaki kararlılık LGS kampındaki yüksek motivasyonunu gösteriyor.
-
-**Değerlendirme Raporu:**
-- Açıklama yaptığın konunun ana hatlarını temel seviyede kurmuşsun.
-- Ses analizi eşleşmelerine göre ifade akışın anlaşılır ve doğru terimler içeriyor.
-
-💡 **Hemen Uygula:** Günlük soru çözüm hedefine sadık kalarak, bu konudaki kazanım testlerini ve mentorunun sana sunduğu adım adım ipuçlarını takip etmeye devam et! Sınavlarda yüksek başarıyı yakalayacaksın!`;
-        }
-      } else {
-        // Simple intelligent parsing for written questions
-        if (lowerText.includes('üslü') || lowerText.includes('kuvvet')) {
-          responseText = 'Harika bir üslü sayı sorusu! LGS\'de üslü sayılarda çarpma kuralını çok sık kullanıyoruz. Eğer tabanlar aynıysa üsleri toplamalısın. Örneğin $2^5 \\cdot 2^3 = 2^8$ olur. Üsler aynı ise tabanları çarpmalısın.';
-        } else if (lowerText.includes('köklü') || lowerText.includes.call(lowerText, 'kök')) {
-          responseText = 'Köklü sayılar LGS\'de en çok soru gelen konulardan biridir. Tam kare sayıları (1, 4, 9, 16, 25, 36...) ezbere bilmek kök dışına çıkarma işlemlerinde sana çok büyük hız kazandıracaktır.';
-        } else if (lowerText.includes('çarpan') || lowerText.includes('kat') || lowerText.includes('asal')) {
-          responseText = 'Çarpanlar ve katlar konusunda asal çarpan algoritmasını iyi kullanmalısın. İki sayının çarpımı, o sayıların EBOB\'u ile EKOK\'unun çarpımına eşittir kuralını sakın unutma!';
-        }
-      }
-
-      const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'ai',
-        text: responseText,
-        timestamp: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
-      };
-      setMessages(prev => [...prev, aiResponse]);
-    }, 1200);
   };
 
   const [resourceUploadTrigger, setResourceUploadTrigger] = useState(0);
@@ -435,34 +509,108 @@ Kendi kelimelerinle yaptığın sesli kavram açıklamasını Google STT motoru 
       }
     };
 
-    const handleGlobalAskAiMentor = (e: Event) => {
-      const customEvent = e as CustomEvent<{ prompt: string }>;
-      if (customEvent?.detail?.prompt) {
-        handleSendMessage(customEvent.detail.prompt);
-      }
-    };
-
     window.addEventListener('select_question', handleGlobalSelectQuestion);
     window.addEventListener('select_resource', handleGlobalSelectResource);
-    window.addEventListener('ask_ai_mentor', handleGlobalAskAiMentor);
 
     return () => {
       window.removeEventListener('select_question', handleGlobalSelectQuestion);
       window.removeEventListener('select_resource', handleGlobalSelectResource);
-      window.removeEventListener('ask_ai_mentor', handleGlobalAskAiMentor);
     };
   }, [questions]);
 
+  // Listen for syllabus updates to dynamically reload/synchronize the questions
   useEffect(() => {
-    loadNewQuestion();
-  }, [difficulty, loadNewQuestion]);
+    const handleSyllabusUpdate = () => {
+      // 1. Load active syllabus and update state
+      const savedSyllabusStr = localStorage.getItem('lgs_custom_syllabus') || localStorage.getItem('lgs_published_syllabus');
+      let activeSyllabus = LGS_SYLLABUS;
+      if (savedSyllabusStr) {
+        try {
+          const parsed = JSON.parse(savedSyllabusStr);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            activeSyllabus = parsed;
+          }
+        } catch (e) {}
+      }
+      setSyllabus(activeSyllabus);
+
+      // 2. Load questions
+      const savedPool = localStorage.getItem('lgs_questions_pool');
+      let currentPool: Question[] = [];
+      if (savedPool) {
+        try {
+          const parsed = JSON.parse(savedPool);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            currentPool = parsed;
+          }
+        } catch (e) {
+          console.error('Failed to parse updated questions pool:', e);
+        }
+      }
+
+      if (currentPool.length === 0) {
+        currentPool = generateLGSQuestions();
+      }
+
+      // 3. Synchronize questions with the active syllabus
+      const synchronized = synchronizeQuestionsWithSyllabus(currentPool, activeSyllabus);
+      setQuestions(synchronized);
+      localStorage.setItem('lgs_questions_pool', JSON.stringify(synchronized));
+
+      // Check if a question bank is currently selected, and sync filters to it
+      const bankId = localStorage.getItem('lgs_selected_bank_id');
+      if (bankId) {
+        const savedBanksStr = localStorage.getItem('lgs_question_banks');
+        if (savedBanksStr) {
+          try {
+            const banks = JSON.parse(savedBanksStr);
+            if (Array.isArray(banks)) {
+              const activeBank = banks.find(b => b.id === bankId);
+              if (activeBank) {
+                setDifficulty('Hepsi');
+                setSelectedSubject(activeBank.subject);
+                setSelectedUnit(activeBank.unit);
+                setSelectedTopic(activeBank.topic);
+                
+                // Set current question to the first question of this bank
+                const bankQuestions = synchronized.filter(q => 
+                  q.subject === activeBank.subject &&
+                  q.unit === activeBank.unit &&
+                  q.topic === activeBank.topic
+                );
+                if (bankQuestions.length > 0) {
+                  setCurrentQuestion(bankQuestions[0]);
+                }
+                return;
+              }
+            }
+          } catch (e) {
+            console.error('Failed to sync filters on syllabus bank update:', e);
+          }
+        }
+      }
+
+      // Falls back to resetting to Hepsi if no specific bank is active
+      setSelectedSubject('Hepsi');
+      setSelectedUnit('Hepsi');
+      setSelectedTopic('Hepsi');
+    };
+
+    window.addEventListener('storage', handleSyllabusUpdate);
+    window.addEventListener('theme-changed', handleSyllabusUpdate);
+    window.addEventListener('lgs_syllabus_updated', handleSyllabusUpdate);
+
+    return () => {
+      window.removeEventListener('storage', handleSyllabusUpdate);
+      window.removeEventListener('theme-changed', handleSyllabusUpdate);
+      window.removeEventListener('lgs_syllabus_updated', handleSyllabusUpdate);
+    };
+  }, [questions]);
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
       <Header 
         onToggleSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
-        onToggleAITutor={() => setIsAITutorOpen(prev => !prev)}
-        isAITutorOpen={isAITutorOpen}
       />
       <div className="flex pt-16 flex-1">
         <Sidebar 
@@ -472,21 +620,29 @@ Kendi kelimelerinle yaptığın sesli kavram açıklamasını Google STT motoru 
           isMobileOpen={isMobileSidebarOpen}
           onClose={() => setIsMobileSidebarOpen(false)}
         />
-        <main className="flex-1 md:ml-64 mr-0 md:mr-[420px] bg-background">
-          {activeTab === 'calisma' && (
+        <main className="flex-1 md:ml-64 mr-0 bg-background z-10 flex flex-col">
+          {activeTab === 'calisma' && currentQuestion && (
             <QuestionArea
               question={currentQuestion}
+              questions={questions}
+              syllabus={syllabus}
               onNewQuestion={loadNewQuestion}
               onAnswer={handleAnswer}
-              onHint={handleHint}
               selectedDifficulty={difficulty}
               setDifficulty={setDifficulty}
               correctStreak={correctStreak}
+              selectedSubject={selectedSubject}
+              setSelectedSubject={setSelectedSubject}
+              selectedUnit={selectedUnit}
+              setSelectedUnit={setSelectedUnit}
+              selectedTopic={selectedTopic}
+              setSelectedTopic={setSelectedTopic}
+              solveHistory={solveHistory}
+              onSelectQuestion={setCurrentQuestion}
             />
           )}
           {activeTab === 'analiz' && <AnalysisView solveHistory={solveHistory} />}
           {activeTab === 'kaynaklar' && <ResourcesView uploadTrigger={resourceUploadTrigger} />}
-          {activeTab === 'ai-rehber' && <AIGuideView />}
           {activeTab === 'ayarlar' && <SettingsView solveHistory={solveHistory} />}
           {activeTab === 'admin' && (
             <AdminView
@@ -505,14 +661,6 @@ Kendi kelimelerinle yaptığın sesli kavram açıklamasını Google STT motoru 
             />
           )}
         </main>
-        <AITutor
-          messages={messages}
-          onSendMessage={handleSendMessage}
-          progress={progress}
-          errorAnalysis={lastErrorAnalysis}
-          isOpen={isAITutorOpen}
-          onClose={() => setIsAITutorOpen(false)}
-        />
       </div>
 
       {/* Modern, High-Conversion Google Sign-Up & Onboarding Modal */}
@@ -543,12 +691,12 @@ Kendi kelimelerinle yaptığın sesli kavram açıklamasını Google STT motoru 
               {/* Star Badge */}
               <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary rounded-full text-[10px] font-black uppercase tracking-wider mx-auto mb-4 border border-primary/15 animate-bounce">
                 <Sparkles size={11} className="text-primary" />
-                <span>Yapay Zekalı LGS Sınıfı</span>
+                <span>EduSınav LGS Çalışma Alanı</span>
               </div>
 
               {/* Title */}
               <h2 className="text-2xl font-serif font-black text-primary tracking-tight mb-2">
-                EduAi ile Dereceye Hazırlan! 🚀
+                EduSınav ile Dereceye Hazırlan! 🚀
               </h2>
               <p className="text-xs text-on-surface-variant max-w-sm mx-auto mb-6 leading-relaxed">
                 Platformumuzun tüm kişiselleştirilmiş analizlerini ve çalışma kütüphanesini bulut güvencesi ile kullanın.
@@ -564,7 +712,7 @@ Kendi kelimelerinle yaptığın sesli kavram açıklamasını Google STT motoru 
                   <div className="space-y-0.5">
                     <h3 className="text-xs font-bold text-primary">Bulut Yedeklemesi & Senkronizasyon</h3>
                     <p className="text-[11px] text-on-surface-variant leading-tight">
-                      Çözdüğün tüm üslü sayı soruları, yanlış analizleri ve kazanılan rozetler asla silinmez.
+                      Çözdüğün tüm LGS soruları, yanlış analizleri ve gelişim istatistikleri asla silinmez.
                     </p>
                   </div>
                 </div>
@@ -590,7 +738,7 @@ Kendi kelimelerinle yaptığın sesli kavram açıklamasını Google STT motoru 
                   <div className="space-y-0.5">
                     <h3 className="text-xs font-bold text-primary">Detaylı Gelişim Grafikleri</h3>
                     <p className="text-[11px] text-on-surface-variant leading-tight">
-                      Yapay zeka asistanı, hedefindeki Kabataş Erkek Lisesi gibi okullara kalan puan mesafeni hedefler.
+                      Sistemimiz çözdüğün ders, ünite ve konu dağılımlarını takip ederek eksik kalan yerlerini listeler.
                     </p>
                   </div>
                 </div>
@@ -637,4 +785,3 @@ Kendi kelimelerinle yaptığın sesli kavram açıklamasını Google STT motoru 
     </div>
   );
 }
-

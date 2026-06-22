@@ -3,9 +3,12 @@ import {
   ShieldAlert, Sparkles, Check, Settings, TrendingUp, FolderOpen, 
   Upload, Zap, BookOpen, Users, Sliders, Database, Mic, Plus, 
   Trash2, Play, RefreshCw, CheckCircle, Search, Code, Cpu, Info, 
-  ArrowRight, Save, LayoutGrid, Award, Server, AlertCircle, Palette, Image
+  ArrowRight, Save, LayoutGrid, Award, Server, AlertCircle, Palette, Image,
+  ChevronUp, ChevronDown, Edit2, X
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import type { Question, Difficulty, SolveHistory, Message } from '../types';
+import { LGS_SYLLABUS, buildQuestion } from '../utils/questionGenerator';
 import ResourcesView from './ResourcesView';
 
 interface AdminViewProps {
@@ -38,7 +41,617 @@ export default function AdminView({
   setCurrentQuestion
 }: AdminViewProps) {
   // Navigation tabs inside the Admin Panel
-  const [adminTab, setAdminTab] = useState<'genel' | 'sorular' | 'ogrenci' | 'prompts' | 'stt-test' | 'bulut-log' | 'kaynaklar' | 'stil'>('genel');
+  const [adminTab, setAdminTab] = useState<'genel' | 'sorular' | 'ogrenci' | 'prompts' | 'stt-test' | 'bulut-log' | 'kaynaklar' | 'stil' | 'mufredat'>('genel');
+
+  // Dynamic syllabus / curriculum süzgeçleri state (holds flat representation under the hood)
+  const [syllabus, setSyllabus] = useState<{ subject: string; unit: string; topic: string }[]>(() => {
+    const saved = localStorage.getItem('lgs_custom_syllabus');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse lgs_custom_syllabus:', e);
+      }
+    }
+    return LGS_SYLLABUS;
+  });
+
+  // Unique Soru Bankaları state
+  interface QuestionBank {
+    id: string;
+    name?: string;
+    subject: string;
+    unit: string;
+    topic: string;
+    createdAt: string;
+  }
+
+  const [questionBanks, setQuestionBanks] = useState<QuestionBank[]>(() => {
+    const saved = localStorage.getItem('lgs_question_banks');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse lgs_question_banks:', e);
+      }
+    }
+    // Deep fallback parsing from syllabus to seed default question banks
+    const uniqueCombos = LGS_SYLLABUS.filter(s => s.subject && s.unit && s.topic);
+    return uniqueCombos.map((s, idx) => ({
+      id: `bank-${idx}`,
+      subject: s.subject,
+      unit: s.unit,
+      topic: s.topic,
+      createdAt: new Date().toLocaleDateString('tr-TR')
+    }));
+  });
+
+  const saveQuestionBanks = (updated: QuestionBank[]) => {
+    setQuestionBanks(updated);
+    localStorage.setItem('lgs_question_banks', JSON.stringify(updated));
+  };
+
+  // Selected Bank ID state
+  const [selectedBankId, setSelectedBankId] = useState<string | null>(() => {
+    return localStorage.getItem('lgs_selected_bank_id') || null;
+  });
+
+  // Watch syllabus and selectedBankId changes and dispatch lgs_syllabus_updated event to sync other views in real-time
+  useEffect(() => {
+    window.dispatchEvent(new Event('lgs_syllabus_updated'));
+  }, [syllabus, selectedBankId]);
+
+  // General tab quick inject states
+  const [injectBankId, setInjectBankId] = useState<string>('');
+  const [injectSubject, setInjectSubject] = useState<string>('Matematik');
+  const [injectUnit, setInjectUnit] = useState<string>('Üslü İfadeler');
+  const [injectTopic, setInjectTopic] = useState<string>('Üssün Üssü Kuralları');
+
+  // Synchronize Hızlı Veri Enjeksiyonu defaults with syllabus changes
+  useEffect(() => {
+    const validSubjects = Array.from(new Set(syllabus.map(s => s.subject).filter(Boolean)));
+    if (validSubjects.length > 0) {
+      if (!injectSubject || !validSubjects.includes(injectSubject)) {
+        const firstSub = validSubjects[0];
+        setInjectSubject(firstSub);
+        
+        const validUnits = Array.from(new Set(syllabus.filter(s => s.subject === firstSub).map(s => s.unit).filter(Boolean)));
+        if (validUnits.length > 0) {
+          setInjectUnit(validUnits[0]);
+          const validTopics = Array.from(new Set(syllabus.filter(s => s.subject === firstSub && s.unit === validUnits[0]).map(s => s.topic).filter(Boolean)));
+          if (validTopics.length > 0) {
+            setInjectTopic(validTopics[0]);
+          } else {
+            setInjectTopic('');
+          }
+        } else {
+          setInjectUnit('');
+          setInjectTopic('');
+        }
+      } else {
+        const validUnits = Array.from(new Set(syllabus.filter(s => s.subject === injectSubject).map(s => s.unit).filter(Boolean)));
+        if (validUnits.length > 0) {
+          if (!injectUnit || !validUnits.includes(injectUnit)) {
+            const firstUnit = validUnits[0];
+            setInjectUnit(firstUnit);
+            const validTopics = Array.from(new Set(syllabus.filter(s => s.subject === injectSubject && s.unit === firstUnit).map(s => s.topic).filter(Boolean)));
+            if (validTopics.length > 0) {
+              setInjectTopic(validTopics[0]);
+            } else {
+              setInjectTopic('');
+            }
+          } else {
+            const validTopics = Array.from(new Set(syllabus.filter(s => s.subject === injectSubject && s.unit === injectUnit).map(s => s.topic).filter(Boolean)));
+            if (validTopics.length > 0) {
+              if (!injectTopic || !validTopics.includes(injectTopic)) {
+                setInjectTopic(validTopics[0]);
+              }
+            } else {
+              setInjectTopic('');
+            }
+          }
+        } else {
+          setInjectUnit('');
+          setInjectTopic('');
+        }
+      }
+    }
+  }, [syllabus, injectSubject, injectUnit, injectTopic]);
+
+  const handleInjectBankIdChange = (bankId: string) => {
+    setInjectBankId(bankId);
+    if (bankId) {
+      const bank = questionBanks.find(b => b.id === bankId);
+      if (bank) {
+        setInjectSubject(bank.subject);
+        setInjectUnit(bank.unit);
+        setInjectTopic(bank.topic);
+      }
+    }
+  };
+
+  // State for hierarchical bank management
+  const [newBankNameInput, setNewBankNameInput] = useState<string>('');
+  const [editingBankId, setEditingBankId] = useState<string | null>(null);
+  const [editingBankNameVal, setEditingBankNameVal] = useState<string>('');
+
+  const handleAddHierarchicalBank = (ders: string, unite: string, topic: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const exists = questionBanks.some(b => 
+      b.subject === ders && 
+      b.unit === unite && 
+      b.topic === topic && 
+      b.name?.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (exists) {
+      addLog('warn', 'QUESTION_BANK', `"${trimmed}" isimli bir soru bankası bu alt konuda zaten mevcut.`);
+      alert(`"${trimmed}" isimli bir soru bankası bu alt konuda zaten mevcut.`);
+      return;
+    }
+    const newBank: QuestionBank = {
+      id: `bank-custom-${Date.now()}`,
+      name: trimmed,
+      subject: ders,
+      unit: unite,
+      topic: topic,
+      createdAt: new Date().toLocaleDateString('tr-TR')
+    };
+    const updated = [...questionBanks, newBank];
+    saveQuestionBanks(updated);
+    addLog('success', 'QUESTION_BANK', `Yeni Soru Bankası oluşturuldu: ${trimmed}`);
+  };
+
+  const handleEditBankName = (id: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    const updated = questionBanks.map(b => b.id === id ? { ...b, name: trimmed } : b);
+    saveQuestionBanks(updated);
+    addLog('success', 'QUESTION_BANK', `Soru bankası adı güncellendi: ${trimmed}`);
+  };
+
+  // Edit states for syllabus elements
+  const [editingDers, setEditingDers] = useState<string | null>(null);
+  const [editingDersVal, setEditingDersVal] = useState<string>('');
+
+  const [editingUnite, setEditingUnite] = useState<string | null>(null);
+  const [editingUniteVal, setEditingUniteVal] = useState<string>('');
+
+  const [editingTopic, setEditingTopic] = useState<string | null>(null);
+  const [editingTopicVal, setEditingTopicVal] = useState<string>('');
+
+  // Custom dialog and popup state for confirmation alerts
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    type: 'confirm' | 'alert';
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    onConfirm?: () => void;
+  } | null>(null);
+
+  const triggerConfirm = (
+    title: string, 
+    message: string, 
+    onConfirm: () => void, 
+    confirmLabel?: string, 
+    cancelLabel?: string
+  ) => {
+    setModalConfig({
+      isOpen: true,
+      type: 'confirm',
+      title,
+      message,
+      confirmLabel,
+      cancelLabel,
+      onConfirm: () => {
+        onConfirm();
+        setModalConfig(null);
+      }
+    });
+  };
+
+  const triggerAlert = (title: string, message: string) => {
+    setModalConfig({
+      isOpen: true,
+      type: 'alert',
+      title,
+      message
+    });
+  };
+
+  // State to toggle form overlay inside a question bank
+  const [showQuestionForm, setShowQuestionForm] = useState(false);
+
+  // States to add a new question bank
+  const [newBankSub, setNewBankSub] = useState('');
+  const [newBankUni, setNewBankUni] = useState('');
+  const [newBankTop, setNewBankTop] = useState('');
+
+  const handleAddQuestionBank = () => {
+    if (!newBankSub || !newBankUni || !newBankTop) {
+      alert('Soru Bankası oluşturmak için Ders, Ünite ve Alt Konu seçmelisiniz!');
+      return;
+    }
+    const exists = questionBanks.some(b => b.subject === newBankSub && b.unit === newBankUni && b.topic === newBankTop);
+    if (exists) {
+      alert('Seçtiğiniz ders, ünite ve alt konuya ait bir Soru Bankası zaten mevcut!');
+      return;
+    }
+    const newBank: QuestionBank = {
+      id: `bank-custom-${Date.now()}`,
+      subject: newBankSub,
+      unit: newBankUni,
+      topic: newBankTop,
+      createdAt: new Date().toLocaleDateString('tr-TR')
+    };
+    const updated = [...questionBanks, newBank];
+    saveQuestionBanks(updated);
+    selectBank(newBank.id);
+    addLog('success', 'QUESTION_BANK', `Yeni Soru Bankası oluşturuldu: ${newBankSub} > ${newBankUni} > ${newBankTop}`);
+    // Clear selections
+    setNewBankSub('');
+    setNewBankUni('');
+    setNewBankTop('');
+  };
+
+  const handleRemoveQuestionBank = (id: string) => {
+    const bank = questionBanks.find(b => b.id === id);
+    if (!bank) return;
+    triggerConfirm(
+      'Soru Bankasını Sil',
+      `"${bank.subject} > ${bank.unit} > ${bank.topic}" Soru Bankasını silmek istediğinize emin misiniz?\n\nNot: Bankanın kendisi silinecektir. Soru silme seçeneği form üzerinden yönetilir.`,
+      () => {
+        const updated = questionBanks.filter(b => b.id !== id);
+        saveQuestionBanks(updated);
+        if (selectedBankId === id) {
+          selectBank(null);
+        }
+        addLog('warn', 'QUESTION_BANK', `Soru Bankası kaldırıldı: ${bank.subject} > ${bank.unit} > ${bank.topic}`);
+      }
+    );
+  };
+
+  const selectBank = (id: string | null) => {
+    setSelectedBankId(id);
+    if (id) {
+      localStorage.setItem('lgs_selected_bank_id', id);
+    } else {
+      localStorage.removeItem('lgs_selected_bank_id');
+    }
+    setShowQuestionForm(false);
+    resetQuestionForm();
+  };
+
+  // Curriculum Tab specific state
+  const [selectedMufredatDers, setSelectedMufredatDers] = useState<string>('');
+  const [selectedMufredatUnite, setSelectedMufredatUnite] = useState<string>('');
+  const [selectedMufredatTopic, setSelectedMufredatTopic] = useState<string>('');
+  
+  const [newDersInput, setNewDersInput] = useState('');
+  const [newUniteInput, setNewUniteInput] = useState('');
+  const [newTopicInput, setNewTopicInput] = useState('');
+
+  // 1. Ders Ekleme
+  const handleAddDers = (ders: string) => {
+    const trimmed = ders.trim();
+    if (!trimmed) return;
+    const exists = syllabus.some(s => s.subject.toLowerCase() === trimmed.toLowerCase());
+    if (exists) {
+      addLog('warn', 'MÜFREDAT', `"${trimmed}" dersi zaten mevcut.`);
+      return;
+    }
+    const updated = [...syllabus, { subject: trimmed, unit: '', topic: '' }];
+    setSyllabus(updated);
+    localStorage.setItem('lgs_custom_syllabus', JSON.stringify(updated));
+    setSelectedMufredatDers(trimmed);
+    setSelectedMufredatUnite('');
+    addLog('success', 'MÜFREDAT', `Yeni ders eklendi: ${trimmed}`);
+  };
+
+  // 2. Ders Çıkarma
+  const handleRemoveDers = (ders: string) => {
+    triggerConfirm(
+      'Dersi Sil',
+      `"${ders}" dersini ve buna bağlı TÜM ünite ile alt konuları silme işlemini onaylıyor musunuz?`,
+      () => {
+        const updated = syllabus.filter(s => s.subject !== ders);
+        setSyllabus(updated);
+        localStorage.setItem('lgs_custom_syllabus', JSON.stringify(updated));
+        if (selectedMufredatDers === ders) {
+          setSelectedMufredatDers('');
+          setSelectedMufredatUnite('');
+        }
+        addLog('warn', 'MÜFREDAT', `Ders komple silindi: ${ders}`);
+      }
+    );
+  };
+
+  // 3. Ünite Ekleme
+  const handleAddUnite = (ders: string, unite: string) => {
+    const trimmedUnite = unite.trim();
+    if (!ders || !trimmedUnite) return;
+    const exists = syllabus.some(s => s.subject === ders && s.unit.toLowerCase() === trimmedUnite.toLowerCase());
+    if (exists) {
+      addLog('warn', 'MÜFREDAT', `"${trimmedUnite}" ünitesi bu derste zaten mevcut.`);
+      return;
+    }
+    const filtered = syllabus.filter(s => !(s.subject === ders && s.unit === '' && s.topic === ''));
+    const updated = [...filtered, { subject: ders, unit: trimmedUnite, topic: '' }];
+    setSyllabus(updated);
+    localStorage.setItem('lgs_custom_syllabus', JSON.stringify(updated));
+    setSelectedMufredatUnite(trimmedUnite);
+    addLog('success', 'MÜFREDAT', `"${ders}" dersine yeni ünite eklendi: ${trimmedUnite}`);
+  };
+
+  // 4. Ünite Çıkarma
+  const handleRemoveUnite = (ders: string, unite: string) => {
+    triggerConfirm(
+      'Üniteyi Sil',
+      `"${unite}" ünitesini ve buna bağlı TÜM alt konuları silmek istediğinize emin misiniz?`,
+      () => {
+        let filtered = syllabus.filter(s => !(s.subject === ders && s.unit === unite));
+        const hasOtherRows = filtered.some(s => s.subject === ders);
+        if (!hasOtherRows) {
+          filtered.push({ subject: ders, unit: '', topic: '' });
+        }
+        setSyllabus(filtered);
+        localStorage.setItem('lgs_custom_syllabus', JSON.stringify(filtered));
+        if (selectedMufredatUnite === unite) {
+          setSelectedMufredatUnite('');
+        }
+        addLog('warn', 'MÜFREDAT', `Ünite silindi: ${ders} > ${unite}`);
+      }
+    );
+  };
+
+  // 5. Alt Konu Ekleme
+  const handleAddTopic = (ders: string, unite: string, topic: string) => {
+    const trimmedTopic = topic.trim();
+    if (!ders || !unite || !trimmedTopic) return;
+    const exists = syllabus.some(s => s.subject === ders && s.unit === unite && s.topic.toLowerCase() === trimmedTopic.toLowerCase());
+    if (exists) {
+      addLog('warn', 'MÜFREDAT', `"${trimmedTopic}" alt konusu bu ünitede zaten mevcut.`);
+      return;
+    }
+    const filtered = syllabus.filter(s => !(s.subject === ders && s.unit === unite && s.topic === ''));
+    const updated = [...filtered, { subject: ders, unit: unite, topic: trimmedTopic }];
+    setSyllabus(updated);
+    localStorage.setItem('lgs_custom_syllabus', JSON.stringify(updated));
+    addLog('success', 'MÜFREDAT', `Yeni alt konu eklendi: ${ders} > ${unite} > ${trimmedTopic}`);
+  };
+
+  // 6. Alt Konu Çıkarma
+  const handleRemoveTopic = (ders: string, unite: string, topic: string) => {
+    triggerConfirm(
+      'Alt Konuyu Sil',
+      `"${topic}" alt konusunu silmek istediğinize emin misiniz?`,
+      () => {
+        let filtered = syllabus.filter(s => !(s.subject === ders && s.unit === unite && s.topic === topic));
+        const hasOtherRows = filtered.some(s => s.subject === ders && s.unit === unite);
+        if (!hasOtherRows) {
+          filtered.push({ subject: ders, unit: unite, topic: '' });
+        }
+        setSyllabus(filtered);
+        localStorage.setItem('lgs_custom_syllabus', JSON.stringify(filtered));
+        addLog('warn', 'MÜFREDAT', `Alt konu silindi: ${ders} > ${unite} > ${topic}`);
+      }
+    );
+  };
+
+  // 7. Ders Sırasını Değiştirme
+  const handleMoveDers = (ders: string, direction: 'up' | 'down') => {
+    const dersList = Array.from(new Set(syllabus.map(s => s.subject).filter(Boolean))) as string[];
+    const index = dersList.indexOf(ders);
+    if (index === -1) return;
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === dersList.length - 1) return;
+
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    const newDersList = [...dersList];
+    newDersList[index] = dersList[targetIndex];
+    newDersList[targetIndex] = ders;
+
+    // Reconstruct syllabus ordered by newDersList
+    const newSyllabus: typeof syllabus = [];
+    newDersList.forEach(subjectName => {
+      const matchingRows = syllabus.filter(s => s.subject === subjectName);
+      newSyllabus.push(...matchingRows);
+    });
+    const otherRows = syllabus.filter(s => !s.subject);
+    newSyllabus.push(...otherRows);
+
+    setSyllabus(newSyllabus);
+    localStorage.setItem('lgs_custom_syllabus', JSON.stringify(newSyllabus));
+    addLog('info', 'MÜFREDAT', `Ders sırası değiştirildi: ${ders} (${direction === 'up' ? 'Yukarı' : 'Aşağı'})`);
+  };
+
+  // 8. Ünite Sırasını Değiştirme
+  const handleMoveUnite = (ders: string, unite: string, direction: 'up' | 'down') => {
+    const unitList = Array.from(new Set(syllabus.filter(s => s.subject === ders).map(s => s.unit).filter(Boolean))) as string[];
+    const index = unitList.indexOf(unite);
+    if (index === -1) return;
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === unitList.length - 1) return;
+
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    const newUnitList = [...unitList];
+    newUnitList[index] = unitList[targetIndex];
+    newUnitList[targetIndex] = unite;
+
+    // Get matching unit rows for this ders
+    const dersRowsForSyllabus: typeof syllabus = [];
+    newUnitList.forEach(unitName => {
+      const matchingUnitRows = syllabus.filter(s => s.subject === ders && s.unit === unitName);
+      dersRowsForSyllabus.push(...matchingUnitRows);
+    });
+    const emptyUnitRows = syllabus.filter(s => s.subject === ders && !s.unit);
+    dersRowsForSyllabus.push(...emptyUnitRows);
+
+    // Assembly with correct order of other subjects
+    const orderOfDers = Array.from(new Set(syllabus.map(s => s.subject).filter(Boolean))) as string[];
+    const finalSyllabus: typeof syllabus = [];
+    orderOfDers.forEach(subj => {
+      if (subj === ders) {
+        finalSyllabus.push(...dersRowsForSyllabus);
+      } else {
+        finalSyllabus.push(...syllabus.filter(s => s.subject === subj));
+      }
+    });
+    const untracked = syllabus.filter(s => !s.subject);
+    finalSyllabus.push(...untracked);
+
+    setSyllabus(finalSyllabus);
+    localStorage.setItem('lgs_custom_syllabus', JSON.stringify(finalSyllabus));
+    addLog('info', 'MÜFREDAT', `Ünite sırası değiştirildi: ${unite} (${direction === 'up' ? 'Yukarı' : 'Aşağı'})`);
+  };
+
+  // 9. Alt Konu Sırasını Değiştirme
+  const handleMoveTopic = (ders: string, unite: string, topic: string, direction: 'up' | 'down') => {
+    const topicList = Array.from(new Set(syllabus.filter(s => s.subject === ders && s.unit === unite).map(s => s.topic).filter(Boolean))) as string[];
+    const index = topicList.indexOf(topic);
+    if (index === -1) return;
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === topicList.length - 1) return;
+
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    const newTopicList = [...topicList];
+    newTopicList[index] = topicList[targetIndex];
+    newTopicList[targetIndex] = topic;
+
+    // Reconstruct topics for this unit
+    const unitRowsForSyllabus: typeof syllabus = [];
+    newTopicList.forEach(topicName => {
+      const matchingTopicRows = syllabus.filter(s => s.subject === ders && s.unit === unite && s.topic === topicName);
+      unitRowsForSyllabus.push(...matchingTopicRows);
+    });
+    const emptyTopicRows = syllabus.filter(s => s.subject === ders && s.unit === unite && !s.topic);
+    unitRowsForSyllabus.push(...emptyTopicRows);
+
+    // Assemble final syllabus
+    const finalSyllabus: typeof syllabus = [];
+    const orderOfDers = Array.from(new Set(syllabus.map(s => s.subject).filter(Boolean))) as string[];
+    orderOfDers.forEach(subj => {
+      if (subj === ders) {
+        const orderOfUnits = Array.from(new Set(syllabus.filter(s => s.subject === ders).map(s => s.unit).filter(Boolean))) as string[];
+        orderOfUnits.forEach(uni => {
+          if (uni === unite) {
+            finalSyllabus.push(...unitRowsForSyllabus);
+          } else {
+            finalSyllabus.push(...syllabus.filter(s => s.subject === ders && s.unit === uni));
+          }
+        });
+        const emptyUnitRows = syllabus.filter(s => s.subject === ders && !s.unit);
+        finalSyllabus.push(...emptyUnitRows);
+      } else {
+        finalSyllabus.push(...syllabus.filter(s => s.subject === subj));
+      }
+    });
+    const untracked = syllabus.filter(s => !s.subject);
+    finalSyllabus.push(...untracked);
+
+    setSyllabus(finalSyllabus);
+    localStorage.setItem('lgs_custom_syllabus', JSON.stringify(finalSyllabus));
+    addLog('info', 'MÜFREDAT', `Alt Konu sırası değiştirildi: ${topic} (${direction === 'up' ? 'Yukarı' : 'Aşağı'})`);
+  };
+
+  // 10. Sitede Yayınlama (Publish)
+  const handlePublishSyllabus = () => {
+    triggerConfirm(
+      'Sitede Yayınla & Güncelle',
+      'Belirlediğiniz ders, ünite ve alt konu sıralama yapısını canlı sitede yayınlamak istiyor musunuz? Bu işlem öğrencilerin ekranındaki tüm filtre süzgeçlerini anlık olarak güncelleyecektir.',
+      () => {
+        localStorage.setItem('lgs_published_syllabus', JSON.stringify(syllabus));
+        localStorage.setItem('lgs_custom_syllabus', JSON.stringify(syllabus));
+        triggerAlert(
+          'Müfredat Canlı Sitede Yayınlandı',
+          'Tebrikler! Belirlediğiniz ders, ünite ve alt konu sıralama yapısı başarıyla yayına alındı. Sitedeki çalışma ve test çözme alanlarındaki filtre süzgeçleri anlık olarak dinamik şekilde güncellenmiştir.'
+        );
+        addLog('success', 'PUBLISH', 'Müfredat yapısı ve sıralaması canlı sitede yayınlandı.');
+        
+        // Dispatch events to refresh parent components
+        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new Event('theme-changed'));
+        window.dispatchEvent(new Event('lgs_syllabus_updated'));
+      },
+      'Evet, Yayınla',
+      'Hayır, Vazgeç'
+    );
+  };
+
+  // 11. Hiyerarşik Müfredat Editör Handlers
+  const handleEditDers = (oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) return;
+    const exists = syllabus.some(s => s.subject.toLowerCase() === trimmed.toLowerCase());
+    if (exists) {
+      addLog('warn', 'MÜFREDAT', `"${trimmed}" isimli bir ders zaten mevcut.`);
+      return;
+    }
+    const updatedSyllabus = syllabus.map(s => s.subject === oldName ? { ...s, subject: trimmed } : s);
+    setSyllabus(updatedSyllabus);
+    localStorage.setItem('lgs_custom_syllabus', JSON.stringify(updatedSyllabus));
+
+    const updatedQuestions = questions.map(q => q.subject === oldName ? { ...q, subject: trimmed } : q);
+    setQuestions(updatedQuestions);
+    saveQuestionsToStorage(updatedQuestions);
+
+    const updatedBanks = questionBanks.map(b => b.subject === oldName ? { ...b, subject: trimmed } : b);
+    saveQuestionBanks(updatedBanks);
+
+    if (selectedMufredatDers === oldName) {
+      setSelectedMufredatDers(trimmed);
+    }
+    addLog('success', 'MÜFREDAT', `Ders adı güncellendi: ${oldName} -> ${trimmed}`);
+  };
+
+  const handleEditUnite = (ders: string, oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) return;
+    const exists = syllabus.some(s => s.subject === ders && s.unit.toLowerCase() === trimmed.toLowerCase());
+    if (exists) {
+      addLog('warn', 'MÜFREDAT', `"${trimmed}" ünitesi bu derste zaten mevcut.`);
+      return;
+    }
+    const updatedSyllabus = syllabus.map(s => (s.subject === ders && s.unit === oldName) ? { ...s, unit: trimmed } : s);
+    setSyllabus(updatedSyllabus);
+    localStorage.setItem('lgs_custom_syllabus', JSON.stringify(updatedSyllabus));
+
+    const updatedQuestions = questions.map(q => (q.subject === ders && q.unit === oldName) ? { ...q, unit: trimmed } : q);
+    setQuestions(updatedQuestions);
+    saveQuestionsToStorage(updatedQuestions);
+
+    const updatedBanks = questionBanks.map(b => (b.subject === ders && b.unit === oldName) ? { ...b, unit: trimmed } : b);
+    saveQuestionBanks(updatedBanks);
+
+    if (selectedMufredatUnite === oldName) {
+      setSelectedMufredatUnite(trimmed);
+    }
+    addLog('success', 'MÜFREDAT', `Ünite adı güncellendi: ${oldName} -> ${trimmed}`);
+  };
+
+  const handleEditTopic = (ders: string, unite: string, oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) return;
+    const exists = syllabus.some(s => s.subject === ders && s.unit === unite && s.topic.toLowerCase() === trimmed.toLowerCase());
+    if (exists) {
+      addLog('warn', 'MÜFREDAT', `"${trimmed}" alt konusu bu ünitede zaten mevcut.`);
+      return;
+    }
+    const updatedSyllabus = syllabus.map(s => (s.subject === ders && s.unit === unite && s.topic === oldName) ? { ...s, topic: trimmed } : s);
+    setSyllabus(updatedSyllabus);
+    localStorage.setItem('lgs_custom_syllabus', JSON.stringify(updatedSyllabus));
+
+    const updatedQuestions = questions.map(q => (q.subject === ders && q.unit === unite && q.topic === oldName) ? { ...q, topic: trimmed } : q);
+    setQuestions(updatedQuestions);
+    saveQuestionsToStorage(updatedQuestions);
+
+    const updatedBanks = questionBanks.map(b => (b.subject === ders && b.unit === unite && b.topic === oldName) ? { ...b, topic: trimmed } : b);
+    saveQuestionBanks(updatedBanks);
+
+    addLog('success', 'MÜFREDAT', `Alt konu adı güncellendi: ${oldName} -> ${trimmed}`);
+  };
 
   // Logs stream simulated for database and cloud operations
   const [logs, setLogs] = useState<{ id: string; time: string; level: 'info' | 'warn' | 'success' | 'err'; tag: string; msg: string }[]>(() => [
@@ -69,6 +682,9 @@ export default function AdminView({
   const [qErrorAnalysis, setQErrorAnalysis] = useState('');
   const [qErrorType, setQErrorType] = useState('Kural Karışıklığı');
   const [qImageUrl, setQImageUrl] = useState('');
+  const [qSubject, setQSubject] = useState('Matematik');
+  const [qUnit, setQUnit] = useState('Üslü İfadeler');
+  const [qTopic, setQTopic] = useState('Üslü Sayılarda Çarpma');
 
   // Prompt calibration state
   const [promptTone, setPromptTone] = useState<'Sokratesçi' | 'Akademik' | 'Çok Yumuşak' | 'Motivasyonel'>('Sokratesçi');
@@ -187,6 +803,9 @@ export default function AdminView({
     setQErrorAnalysis(q.errorAnalysis);
     setQErrorType(q.errorType);
     setQImageUrl(q.imageUrl || '');
+    setQSubject(q.subject || 'Matematik');
+    setQUnit(q.unit || 'Üslü İfadeler');
+    setQTopic(q.topic || 'Üslü Sayılarda Çarpma');
   };
 
   const handleSaveQuestion = () => {
@@ -204,6 +823,12 @@ export default function AdminView({
 
     const targetId = editingQuestionId || Date.now().toString();
 
+    // Check if we have an active question bank selected to auto-bind values
+    const activeBank = questionBanks.find(b => b.id === selectedBankId);
+    const finalSubject = activeBank ? activeBank.subject : (qSubject.trim() || 'Matematik');
+    const finalUnit = activeBank ? activeBank.unit : (qUnit.trim() || 'Üslü İfadeler');
+    const finalTopic = activeBank ? activeBank.topic : (qTopic.trim() || 'Üslü Sayılarda Çarpma');
+
     const updatedQuestion: Question = {
       id: targetId,
       difficulty: qDifficulty,
@@ -214,7 +839,10 @@ export default function AdminView({
       hint: qHint,
       errorAnalysis: qErrorAnalysis,
       errorType: qErrorType,
-      imageUrl: qImageUrl.trim() || undefined
+      imageUrl: qImageUrl.trim() || undefined,
+      subject: finalSubject,
+      unit: finalUnit,
+      topic: finalTopic
     };
 
     let newPool: Question[] = [];
@@ -230,12 +858,13 @@ export default function AdminView({
     saveQuestionsToStorage(newPool);
 
     // If we updated the active question, refresh it too
-    if (currentQuestion.id === targetId) {
+    if (currentQuestion && currentQuestion.id === targetId) {
       setCurrentQuestion(updatedQuestion);
     }
 
     // Reset fields
     resetQuestionForm();
+    setShowQuestionForm(false);
   };
 
   const resetQuestionForm = () => {
@@ -253,6 +882,9 @@ export default function AdminView({
     setQErrorAnalysis('');
     setQErrorType('Kural Karışıklığı');
     setQImageUrl('');
+    setQSubject('Matematik');
+    setQUnit('Üslü İfadeler');
+    setQTopic('Üslü Sayılarda Çarpma');
   };
 
   const handleDeleteQuestion = (id: string) => {
@@ -260,15 +892,19 @@ export default function AdminView({
       alert('Sistemde en az 1 adet soru kalmalıdır!');
       return;
     }
-    if (confirm('Bu soruyu havuzdan kalıcı olarak silmek istediğinizden emin misiniz?')) {
-      const filtered = questions.filter(q => q.id !== id);
-      setQuestions(filtered);
-      saveQuestionsToStorage(filtered);
-      addLog('warn', 'QUESTION', `"${id}" ID'li soru başarıyla silindi.`);
-      if (currentQuestion.id === id) {
-        setCurrentQuestion(filtered[0]);
+    triggerConfirm(
+      'Soruyu Sil',
+      'Bu soruyu havuzdan kalıcı olarak silmek istediğinizden emin misiniz?',
+      () => {
+        const filtered = questions.filter(q => q.id !== id);
+        setQuestions(filtered);
+        saveQuestionsToStorage(filtered);
+        addLog('warn', 'QUESTION', `"${id}" ID'li soru başarıyla silindi.`);
+        if (currentQuestion.id === id) {
+          setCurrentQuestion(filtered[0]);
+        }
       }
-    }
+    );
   };
 
   // Test custom input using our backend algorithms and output matching
@@ -296,7 +932,8 @@ export default function AdminView({
   };
 
   return (
-    <div className="p-8 space-y-8 bg-[#fafafa] min-h-screen">
+    <>
+      <div className="p-8 space-y-8 bg-[#fafafa] min-h-screen">
       
       {/* Super Elite Header with Matrix Vibe */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-outline pb-6">
@@ -308,10 +945,10 @@ export default function AdminView({
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           </div>
           <h1 className="text-3xl font-serif font-black text-primary tracking-tight mt-1">
-            EduAi Admin Merkezi
+            EduSınav Yönetim Merkezi
           </h1>
           <p className="text-xs text-on-surface-variant font-medium mt-1 leading-relaxed">
-            Sistem parametrelerini kalibre edin, soru havuzunu yönetin ve Google STT ses tanıma testlerini yapın.
+            Sistem parametrelerini kalibre edin, soru havuzunu yönetin ve diğer ders içeriklerini güncelleyin.
           </p>
         </div>
 
@@ -452,28 +1089,6 @@ export default function AdminView({
           <span>Öğrenci Simülasyonu</span>
         </button>
 
-        {/* Prompt Calibration Panels */}
-        <button
-          onClick={() => setAdminTab('prompts')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider shrink-0 transition-all cursor-pointer ${
-            adminTab === 'prompts' ? 'bg-primary text-white shadow-sm' : 'text-on-surface-variant hover:bg-neutral-100 hover:text-primary'
-          }`}
-        >
-          <Settings size={14} className="shrink-0" />
-          <span>Yapay Zeka Prompt Kalibrasyonu</span>
-        </button>
-
-        {/* STT Keyword Diagnostic Sandbox */}
-        <button
-          onClick={() => setAdminTab('stt-test')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider shrink-0 transition-all cursor-pointer ${
-            adminTab === 'stt-test' ? 'bg-primary text-white shadow-sm' : 'text-on-surface-variant hover:bg-neutral-100 hover:text-primary'
-          }`}
-        >
-          <Mic size={14} className="shrink-0" />
-          <span>Sesli Analiz Tanı Testi (STT)</span>
-        </button>
-
         {/* Logs Stream Panel */}
         <button
           onClick={() => setAdminTab('bulut-log')}
@@ -507,6 +1122,17 @@ export default function AdminView({
           <span>Görsel Stil &amp; Tema</span>
         </button>
 
+        {/* Müfredat Süzgeçleri Yönetimi */}
+        <button
+          onClick={() => setAdminTab('mufredat')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider shrink-0 transition-all cursor-pointer ${
+            adminTab === 'mufredat' ? 'bg-[#059669] text-white shadow-sm' : 'text-on-surface-variant hover:bg-neutral-100 hover:text-primary'
+          }`}
+        >
+          <LayoutGrid size={14} className="shrink-0" />
+          <span>Müfredat Süzgeçleri ({syllabus.length})</span>
+        </button>
+
       </div>
 
       {/* Main Grid View */}
@@ -531,42 +1157,117 @@ export default function AdminView({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3">
                   
                   {/* Option Block A */}
-                  <div className="p-4 bg-surface-dim/40 rounded-xl border border-outline/50 space-y-2">
+                  <div className="p-4 bg-surface-dim/40 rounded-xl border border-outline/50 space-y-3">
                     <h3 className="text-xs font-bold text-primary flex items-center gap-1.5">
                       <Zap size={14} className="text-amber-500" />
-                      <span>Hızlı Veri Enjeksiyonu</span>
+                      <span>Hızlı Veri Enjeksiyonu (Süzgeçli)</span>
                     </h3>
                     <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                      LGS müfredatında yer alan üslü ve köklü sayılar kazanımlarını simüle eden test setlerini veri ambarına ekler.
+                      Belirlediğiniz ders, ünite, alt konu ve soru bankası süzgeçlerine göre akıllı LGS soruları üreterek havuza anlık enjekte eder.
                     </p>
+
+                    <div className="space-y-2 py-1 text-xs">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-primary font-bold block uppercase tracking-wider">İsteğe Bağlı Soru Bankası</label>
+                          <select
+                            value={injectBankId}
+                            onChange={(e) => handleInjectBankIdChange(e.target.value)}
+                            className="w-full bg-white border border-outline rounded-xl p-2 text-[11px] text-primary font-bold focus:outline-none focus:border-primary cursor-pointer"
+                          >
+                            <option value="">-- Genel Soru Havuzu --</option>
+                            {questionBanks.map(b => (
+                              <option key={b.id} value={b.id}>{b.name || `${b.subject} -> ${b.unit}`}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-primary font-bold block uppercase tracking-wider">Hedef Ders</label>
+                          <select
+                            value={injectSubject}
+                            onChange={(e) => {
+                              setInjectSubject(e.target.value);
+                              setInjectUnit('');
+                              setInjectTopic('');
+                            }}
+                            className="w-full bg-white border border-outline rounded-xl p-2 text-[11px] text-primary font-bold focus:outline-none focus:border-primary cursor-pointer"
+                          >
+                            {Array.from(new Set(syllabus.map(s => s.subject).filter(Boolean))).map(s => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-primary font-bold block uppercase tracking-wider">Hedef Ünite</label>
+                          <select
+                            value={injectUnit}
+                            onChange={(e) => {
+                              setInjectUnit(e.target.value);
+                              setInjectTopic('');
+                            }}
+                            className="w-full bg-white border border-outline rounded-xl p-2 text-[11px] text-primary font-bold focus:outline-none focus:border-primary cursor-pointer"
+                          >
+                            <option value="">-- Ünite Seçin --</option>
+                            {Array.from(new Set(syllabus.filter(s => s.subject === injectSubject).map(s => s.unit).filter(Boolean))).map(u => (
+                              <option key={u} value={u}>{u}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-primary font-bold block uppercase tracking-wider">Alt Konu (Kazanım)</label>
+                          <select
+                            value={injectTopic}
+                            onChange={(e) => setInjectTopic(e.target.value)}
+                            className="w-full bg-white border border-outline rounded-xl p-2 text-[11px] text-primary font-bold focus:outline-none focus:border-primary cursor-pointer"
+                          >
+                            <option value="">-- Konu Seçin --</option>
+                            {Array.from(new Set(syllabus.filter(s => s.subject === injectSubject && s.unit === injectUnit).map(s => s.topic).filter(Boolean))).map(t => (
+                              <option key={t} value={t}>{t}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
                     <button
                       onClick={() => {
-                        const countBefore = questions.length;
-                        const newQ: Question = {
-                          id: (Date.now() + 10).toString(),
-                          difficulty: 'Zor',
-                          text: `Gelişmiş LGS Matematik Deneme Sorusu: $a \\neq 0$ olmak üzere bir kenarı $a^3$ metre olan bir oyun parkının etrafı her bir kenarının ortasında lamba bulunacak biçimde tasarlanmıştır.`,
-                          context: '"Bu oyun parkının bir dış kenarı $a^{12}$ birim kareye genişletilmek istenmektedir."',
-                          query: 'Toplam alanın genişleme katsayısı kaç katına karşılık gelmektedir?',
-                          options: [
-                            { label: 'A', value: 'a¹²', isCorrect: false },
-                            { label: 'B', value: 'a⁹', isCorrect: true },
-                            { label: 'C', value: 'a⁶', isCorrect: false },
-                            { label: 'D', value: 'a³', isCorrect: false }
-                          ],
-                          hint: 'Kare alan formülünü ($E = S^2$) kullanarak önce ilk alanı, daha sonra yeni alanı bulmalı ve oranlamalısınız.',
-                          errorAnalysis: 'Üssün üssünü alırken çarpma işlemi yerine toplama hatasına düşmüş olabilirsiniz.',
-                          errorType: 'Üssün Üssü Karışıklığı'
-                        };
+                        if (!injectSubject || !injectUnit || !injectTopic) {
+                          alert('Lütfen soru üretilebilmesi için Ders, Ünite ve Alt Konu seçiniz!');
+                          return;
+                        }
+                        
+                        const topicQuestionsCount = questions.filter(q => 
+                          q.subject === injectSubject && 
+                          q.unit === injectUnit && 
+                          q.topic === injectTopic
+                        ).length;
+
+                        const index = topicQuestionsCount + 1;
+                        const difficulty: Difficulty = index <= 6 ? 'Kolay' : index <= 14 ? 'Orta' : 'Zor';
+                        const subjectPrefix = injectSubject.substring(0, 3).toUpperCase();
+                        const topicSuffix = injectTopic.replace(/\s+/g, '').substring(0, 5).toUpperCase();
+                        const qId = `${subjectPrefix}-${topicSuffix}-${100 + index}`;
+
+                        const newQ = buildQuestion(injectSubject, injectUnit, injectTopic, index, difficulty, qId);
+                        
                         const updated = [...questions, newQ];
                         setQuestions(updated);
                         saveQuestionsToStorage(updated);
-                        addLog('success', 'INJECT', 'Zor seviye akıllı deneme sorusu havuzla eşleştirildi.');
-                        alert('Zor seviye akıllı LGS sorusu başarıyla sisteme enjekte edildi!');
+                        
+                        // Fire event so workspace gets it instantly
+                        window.dispatchEvent(new Event('lgs_syllabus_updated'));
+
+                        addLog('success', 'INJECT', `Akıllı Soru Üretildi ve Enjekte Edildi: ${injectSubject} > ${injectUnit} > ${injectTopic}`);
+                        alert(`"${injectSubject} > ${injectUnit} > ${injectTopic}" kategorisine ait "${difficulty}" zorluk derecesinde LGS tabanlı akıllı test sorusu başarıyla üretildi ve soru havuzuna eklendi!`);
                       }}
-                      className="px-3 py-1.5 bg-primary hover:bg-primary-hover text-white text-[10px] uppercase font-bold tracking-wider rounded-lg shadow transition-all cursor-pointer"
+                      className="px-4 py-2 bg-[#059669] hover:bg-emerald-700 text-white text-[10px] uppercase font-bold tracking-wider rounded-xl shadow-md transition-all cursor-pointer w-full text-center"
                     >
-                      Yeni Soru Enjekte Et
+                      Seçili Süzgece Göre Akıllı Soru Enjekte Et
                     </button>
                   </div>
 
@@ -653,315 +1354,532 @@ export default function AdminView({
             </div>
           )}
 
-          {/* 2. QUESTIONS MANAGER TAB PANEL */}
+          {/* 2. QUESTIONS MANAGER TAB PANEL (SORU BANKALARI YÖNETİM SİSTEMİ) */}
           {adminTab === 'sorular' && (
             <div className="space-y-6">
-              <div className="bg-white border border-outline rounded-3xl p-6 shadow-sm space-y-6">
+              
+              {/* Main Two-Column Layout */}
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
                 
-                <div className="flex items-center justify-between pb-2 border-b border-light-outline flex-wrap gap-4">
-                  <div className="flex items-center gap-2">
-                    <BookOpen size={18} className="text-primary" />
-                    <h2 className="text-lg font-serif font-black text-primary">
-                      {editingQuestionId ? `Soruyu Düzenliyorsunuz: ID ${editingQuestionId}` : 'Yeni LGS Matematik Sorusu Ekle'}
-                    </h2>
-                  </div>
-                  {editingQuestionId && (
-                    <button
-                      onClick={resetQuestionForm}
-                      className="px-3 py-1 bg-surface-dim border border-outline hover:text-primary transition-all text-[10px] font-bold uppercase tracking-wider rounded-lg cursor-pointer"
-                    >
-                      Düzenlemeyi İptal Et
-                    </button>
-                  )}
-                </div>
-
-                {/* Soru Düzenleme / Ekleme Formu */}
-                <div className="space-y-4 text-xs font-semibold">
+                {/* SOL KOLON: SORU BANKALARI LİSTE VE OLUŞTURMA */}
+                <div className="xl:col-span-1 space-y-6">
                   
-                  {/* Üst grup: Zorluk ve Hata Tipi */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-primary block">Soru Zorluğu</label>
-                      <select
-                        value={qDifficulty}
-                        onChange={(e) => setQDifficulty(e.target.value as Difficulty)}
-                        className="w-full bg-surface-dim border border-outline rounded-xl p-3 focus:outline-none focus:border-primary text-primary font-bold"
-                      >
-                        <option value="Kolay">Kolay Seviye</option>
-                        <option value="Orta">Orta Seviye</option>
-                        <option value="Zor">Zor Seviye (Derece)</option>
-                      </select>
-                    </div>
+                  {/* Yeni Soru Bankası Oluşturma Kartı */}
+                  <div className="bg-white border border-outline rounded-3xl p-5 shadow-sm space-y-4">
+                    <h3 className="text-xs font-black uppercase tracking-widest text-primary border-b border-light-outline pb-2 flex items-center gap-1.5">
+                      <Plus size={14} className="text-[#059669]" />
+                      <span>Yeni Soru Bankası Oluştur</span>
+                    </h3>
 
-                    <div className="space-y-1.5">
-                      <label className="text-primary block">Sık Yapılan Hata Türü (Error Type)</label>
-                      <input
-                        type="text"
-                        placeholder="Örn: Kural Karışıklığı, İşlem Hatası"
-                        value={qErrorType}
-                        onChange={(e) => setQErrorType(e.target.value)}
-                        className="w-full bg-surface-dim border border-outline rounded-xl p-3 focus:outline-none focus:border-primary text-primary font-bold"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Soru Gövdesi, Bağlam ve Soru Kökü */}
-                  <div className="space-y-1.5">
-                    <label className="text-primary block">Başlangıç Bağlamı (Context Quote / Tırnak İçindeki İfade)</label>
-                    <input
-                      type="text"
-                      placeholder="Örn: 'Üslü ifadelerde tabanlar aynı olduğunda...'"
-                      value={qContext}
-                      onChange={(e) => setQContext(e.target.value)}
-                      className="w-full bg-surface-dim border border-outline rounded-xl p-3 focus:outline-none focus:border-primary text-primary font-medium"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-primary block">Soru Ana Metni (Giriş Hikayesi)</label>
-                    <textarea
-                      rows={3}
-                      placeholder="Sorunun senaryosunu ve matematiksel hikayesini girin..."
-                      value={qText}
-                      onChange={(e) => setQText(e.target.value)}
-                      className="w-full bg-surface-dim border border-outline rounded-xl p-3 focus:outline-none focus:border-primary text-primary font-medium resize-none leading-relaxed"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-primary block">Soru Sorusu (Net Query - 'Buna göre toplam alan kaç metrekaredir?')</label>
-                    <input
-                      type="text"
-                      placeholder="Kullanıcıdan doğrudan istenen işlem kökünü girin..."
-                      value={qQuery}
-                      onChange={(e) => setQQuery(e.target.value)}
-                      className="w-full bg-surface-dim border border-outline rounded-xl p-3 focus:outline-none focus:border-primary text-primary font-medium"
-                    />
-                  </div>
-
-                  {/* Şıklar Grubu */}
-                  <div className="space-y-2">
-                    <label className="text-primary block">Seçenekler & Şıklar</label>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-3 text-xs font-semibold">
                       
-                      {/* A opsiyon */}
-                      <div className="flex items-center gap-2 bg-surface-dim/40 border border-outline/65 p-2 rounded-xl">
-                        <span className="w-6 h-6 rounded-md bg-neutral-200 text-neutral-800 flex items-center justify-center font-bold font-mono text-xs">A</span>
-                        <input
-                          type="text"
-                          placeholder="A Değeri"
-                          value={optA}
-                          onChange={(e) => setOptA(e.target.value)}
-                          className="flex-1 bg-transparent p-1.5 outline-none border-none text-primary font-bold focus:ring-0"
-                        />
+                      {/* Ders Seçiçi */}
+                      <div className="space-y-1.5">
+                        <label className="text-primary block text-[11px] uppercase tracking-wider">Müfredat Dersi</label>
+                        <select
+                          value={newBankSub}
+                          onChange={(e) => {
+                            setNewBankSub(e.target.value);
+                            setNewBankUni('');
+                            setNewBankTop('');
+                          }}
+                          className="w-full bg-surface-dim border border-outline rounded-xl p-2.5 text-xs text-primary font-bold focus:outline-none focus:border-primary"
+                        >
+                          <option value="">-- Ders Seçiniz --</option>
+                          {Array.from(new Set(syllabus.map(s => s.subject).filter(Boolean))).map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
                       </div>
 
-                      {/* B opsiyon */}
-                      <div className="flex items-center gap-2 bg-surface-dim/40 border border-outline/65 p-2 rounded-xl">
-                        <span className="w-6 h-6 rounded-md bg-neutral-200 text-neutral-800 flex items-center justify-center font-bold font-mono text-xs">B</span>
-                        <input
-                          type="text"
-                          placeholder="B Değeri"
-                          value={optB}
-                          onChange={(e) => setOptB(e.target.value)}
-                          className="flex-1 bg-transparent p-1.5 outline-none border-none text-primary font-bold focus:ring-0"
-                        />
+                      {/* Ünite Seçici */}
+                      <div className="space-y-1.5">
+                        <label className="text-primary block text-[11px] uppercase tracking-wider">Ders Ünitesi</label>
+                        <select
+                          value={newBankUni}
+                          disabled={!newBankSub}
+                          onChange={(e) => {
+                            setNewBankUni(e.target.value);
+                            setNewBankTop('');
+                          }}
+                          className="w-full bg-surface-dim border border-outline rounded-xl p-2.5 text-xs text-primary font-bold focus:outline-none focus:border-primary disabled:opacity-50"
+                        >
+                          <option value="">-- Ünite Seçiniz --</option>
+                          {Array.from(new Set(syllabus.filter(s => s.subject === newBankSub).map(s => s.unit).filter(Boolean))).map(u => (
+                            <option key={u} value={u}>{u}</option>
+                          ))}
+                        </select>
                       </div>
 
-                      {/* C opsiyon */}
-                      <div className="flex items-center gap-2 bg-surface-dim/40 border border-outline/65 p-2 rounded-xl">
-                        <span className="w-6 h-6 rounded-md bg-neutral-200 text-neutral-800 flex items-center justify-center font-bold font-mono text-xs">C</span>
-                        <input
-                          type="text"
-                          placeholder="C Değeri"
-                          value={optC}
-                          onChange={(e) => setOptC(e.target.value)}
-                          className="flex-1 bg-transparent p-1.5 outline-none border-none text-primary font-bold focus:ring-0"
-                        />
+                      {/* Alt Konu Seçici */}
+                      <div className="space-y-1.5">
+                        <label className="text-primary block text-[11px] uppercase tracking-wider">Alt Konu / Kazanım</label>
+                        <select
+                          value={newBankTop}
+                          disabled={!newBankUni}
+                          onChange={(e) => setNewBankTop(e.target.value)}
+                          className="w-full bg-surface-dim border border-outline rounded-xl p-2.5 text-xs text-primary font-bold focus:outline-none focus:border-primary disabled:opacity-50"
+                        >
+                          <option value="">-- Alt Konu Seçiniz --</option>
+                          {Array.from(new Set(syllabus.filter(s => s.subject === newBankSub && s.unit === newBankUni).map(s => s.topic).filter(Boolean))).map(t => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
                       </div>
 
-                      {/* D opsiyon */}
-                      <div className="flex items-center gap-2 bg-surface-dim/40 border border-outline/65 p-2 rounded-xl">
-                        <span className="w-6 h-6 rounded-md bg-neutral-200 text-neutral-800 flex items-center justify-center font-bold font-mono text-xs">D</span>
-                        <input
-                          type="text"
-                          placeholder="D Değeri"
-                          value={optD}
-                          onChange={(e) => setOptD(e.target.value)}
-                          className="flex-1 bg-transparent p-1.5 outline-none border-none text-primary font-bold focus:ring-0"
-                        />
-                      </div>
-
-                    </div>
-                  </div>
-
-                  {/* Doğru Şık Seçimi, İpucu, Detaylı Hata Analizleri */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-primary block">Doğru Şık Hangisi?</label>
-                      <select
-                        value={correctOption}
-                        onChange={(e) => setCorrectOption(e.target.value as 'A' | 'B' | 'C' | 'D')}
-                        className="w-full bg-surface-dim border border-outline rounded-xl p-3 focus:outline-none focus:border-primary text-emerald-700 font-bold"
+                      <button
+                        onClick={handleAddQuestionBank}
+                        disabled={!newBankSub || !newBankUni || !newBankTop}
+                        className="w-full py-2.5 bg-[#059669] hover:bg-emerald-700 disabled:bg-neutral-200 disabled:text-neutral-400 text-white font-black uppercase text-[10px] tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
                       >
-                        <option value="A">A şıkkı doğru cevap</option>
-                        <option value="B">B şıkkı doğru cevap</option>
-                        <option value="C">C şıkkı doğru cevap</option>
-                        <option value="D">D şıkkı doğru cevap</option>
-                      </select>
-                    </div>
+                        <Plus size={14} />
+                        <span>Soru Bankasını Ekle</span>
+                      </button>
 
-                    <div className="space-y-1.5">
-                      <label className="text-primary block">Süreç İpucu (Hint / Socrates Hint)</label>
-                      <input
-                        type="text"
-                        placeholder="Örn: 25 sayısını 5 sayısının karesi olarak yazmayı dene..."
-                        value={qHint}
-                        onChange={(e) => setQHint(e.target.value)}
-                        className="w-full bg-surface-dim border border-outline rounded-xl p-3 focus:outline-none focus:border-primary text-primary font-medium"
-                      />
                     </div>
                   </div>
 
-                  {/* Görsel İpucu URL */}
-                  <div className="space-y-1.5 font-semibold text-xs">
-                    <label className="text-primary block flex items-center gap-1.5">
-                      Görsel İpucu URL'si <span className="font-normal text-on-surface-variant/70 italic">(İsteğe bağlı - Diyagramlar, grafikler ve geometrik çizimler için görsel web adresi veya lokal görsel yolu)</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Örn: https://images.unsplash.com/... veya lokal görsel adresi"
-                      value={qImageUrl}
-                      onChange={(e) => setQImageUrl(e.target.value)}
-                      className="w-full bg-surface-dim border border-outline rounded-xl p-3 focus:outline-none focus:border-primary text-primary font-medium"
-                    />
-                  </div>
+                  {/* Soru Bankaları Listesi */}
+                  <div className="bg-white border border-outline rounded-3xl p-5 shadow-sm space-y-3">
+                    <h3 className="text-xs font-black uppercase tracking-widest text-primary border-b border-light-outline pb-2 flex justify-between items-center">
+                      <span>Mevcut Soru Bankaları</span>
+                      <span className="text-[10px] font-mono bg-neutral-100 text-primary border border-outline rounded-full px-2 py-0.5">
+                        {questionBanks.length} Adet
+                      </span>
+                    </h3>
 
-                  <div className="space-y-1.5">
-                    <label className="text-primary block">Hedeflenen Hata Analizi Tavsiyesi (Error Warning Suggestion)</label>
-                    <textarea
-                      rows={2}
-                      placeholder="Öğrenci yanlış şıkkı tıkladığında hata analizi panelinde belirecek düzeltici öneriyi buraya yazın..."
-                      value={qErrorAnalysis}
-                      onChange={(e) => setQErrorAnalysis(e.target.value)}
-                      className="w-full bg-surface-dim border border-outline rounded-xl p-3 focus:outline-none focus:border-primary text-primary font-medium resize-none leading-relaxed"
-                    />
-                  </div>
+                    {/* Scrollable list */}
+                    <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                      {questionBanks.map((bank) => {
+                        const isSelected = selectedBankId === bank.id;
+                        // Calculate total questions in this bank
+                        const bankCount = questions.filter(q => 
+                          q.subject === bank.subject && 
+                          q.unit === bank.unit && 
+                          q.topic === bank.topic
+                        ).length;
 
-                  {/* Kaydetme Butonu */}
-                  <div className="flex justify-end gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={resetQuestionForm}
-                      className="px-4 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-primary uppercase font-bold text-[10px] tracking-wider rounded-xl transition-all cursor-pointer"
-                    >
-                      Temizle
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSaveQuestion}
-                      className="px-5 py-2.5 bg-primary hover:bg-primary-hover text-white uppercase font-bold text-[10px] tracking-wider rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Save size={14} />
-                      <span>{editingQuestionId ? 'Soruyu Güncelle' : 'Soruyu Havuza Ekle'}</span>
-                    </button>
-                  </div>
+                        return (
+                          <div
+                            key={bank.id}
+                            onClick={() => selectBank(bank.id)}
+                            className={`p-3 border rounded-2xl cursor-pointer transition-all flex flex-col justify-between space-y-2 relative text-left ${
+                              isSelected
+                                ? 'border-[#059669] bg-[#059669]/5 shadow-sm'
+                                : 'border-outline bg-white hover:bg-neutral-50/50'
+                            }`}
+                          >
+                            <div className="space-y-1">
+                              <div className="flex justify-between items-start gap-2">
+                                <span className="bg-emerald-50 text-[#059669] text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border border-emerald-100">
+                                  {bank.subject}
+                                </span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveQuestionBank(bank.id);
+                                  }}
+                                  className="p-1 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-all shrink-0 cursor-pointer"
+                                  title="Soru Bankasını Sil"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                              <h4 className="text-xs font-serif font-black text-primary line-clamp-1">{bank.unit}</h4>
+                              <p className="text-[10px] text-on-surface-variant leading-normal font-medium line-clamp-1">{bank.topic}</p>
+                            </div>
 
-                </div>
-
-              </div>
-
-              {/* Soru Listesi Tablosu */}
-              <div className="bg-white border border-outline rounded-3xl p-6 shadow-sm space-y-4">
-                <div className="flex items-center justify-between pb-2 border-b border-light-outline">
-                  <h3 className="font-serif font-black text-lg text-primary">Sistemdeki Aktif Soru Havuzu</h3>
-                  <span className="text-xs font-mono font-bold bg-surface-dim px-2.5 py-1 rounded-full text-primary border border-outline">
-                    Ölçü: {questions.length} Soru
-                  </span>
-                </div>
-
-                <div className="space-y-3">
-                  {questions.map((q, idx) => {
-                    const isCorrectOptionLabel = q.options.find(o => o.isCorrect)?.label;
-                    return (
-                      <div
-                        key={q.id}
-                        className={`p-4 border rounded-2xl flex items-start justify-between gap-4 transition-all hover:bg-surface-bright ${
-                          currentQuestion.id === q.id 
-                            ? 'border-primary bg-primary/[0.01] shadow-sm' 
-                            : 'border-outline bg-white'
-                        }`}
-                      >
-                        <div className="space-y-1.5 flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="bg-neutral-100 border border-neutral-200 text-neutral-800 font-mono font-bold text-[10px] px-2 py-0.5 rounded">
-                              Soru #{q.id}
-                            </span>
-                            {q.imageUrl && (
-                              <span className="bg-sky-50 border border-sky-100 text-sky-700 font-mono font-bold text-[10px] px-2 py-0.5 rounded flex items-center gap-1" title="Görsel İpucu Mevcut">
-                                <Image size={10} className="text-sky-600" />
-                                <span>Görsel İpucu</span>
+                            {/* Badge count */}
+                            <div className="flex items-center justify-between pt-1 border-t border-dashed border-outline-variant text-[9px] font-mono font-bold text-on-surface-variant/70">
+                              <span>Eklenme: {bank.createdAt || 'Varsayılan'}</span>
+                              <span className="bg-neutral-100 p-1 px-2 rounded-full font-sans font-black text-primary">
+                                {bankCount} Soru
                               </span>
-                            )}
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                              q.difficulty === 'Zor' 
-                                ? 'bg-rose-50 border border-rose-100 text-rose-600' 
-                                : q.difficulty === 'Orta' 
-                                ? 'bg-indigo-50 border border-indigo-100 text-indigo-600' 
-                                : 'bg-emerald-50 border border-emerald-100 text-emerald-600'
-                            }`}>
-                              {q.difficulty}
-                            </span>
-                            <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">
-                              Hata: {q.errorType}
-                            </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {questionBanks.length === 0 && (
+                        <div className="p-6 text-center border border-dashed border-outline rounded-2xl bg-neutral-50/50 space-y-1">
+                          <BookOpen size={16} className="text-on-surface-variant/40 mx-auto" />
+                          <p className="text-[11px] text-on-surface-variant font-bold">Herhangi bir soru bankası bulunamadı.</p>
+                          <p className="text-[9px] text-on-surface-variant/70">Yukarıdaki form aracılığıyla hemen bir tane tanımlayın.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* SAĞ KOLON: SEÇİLİ SORU BANKASININ DETAYLARI VE SORU EKLEME/LİSTELEME */}
+                <div className="xl:col-span-2 space-y-6">
+                  
+                  {!selectedBankId || !questionBanks.find(b => b.id === selectedBankId) ? (
+                    <div className="bg-white border border-outline rounded-3xl p-12 text-center shadow-sm flex flex-col items-center justify-center space-y-3 min-h-[400px]">
+                      <div className="w-12 h-12 bg-neutral-50 rounded-full flex items-center justify-center border border-outline text-[#059669]">
+                        <BookOpen size={24} />
+                      </div>
+                      <h3 className="font-serif font-black text-lg text-primary">Soru Bankası Seçilmedi</h3>
+                      <p className="text-xs text-on-surface-variant max-w-sm leading-relaxed mx-auto font-medium">
+                        Sol tarafta yer alan mevcut LGS soru bankalarından birini seçebilir veya hiyerarşik müfredata uygun yeni bir soru bankası tanımlayarak içerisindeki soruları yönetebilirsiniz.
+                      </p>
+                    </div>
+                  ) : (() => {
+                    const activeBank = questionBanks.find(b => b.id === selectedBankId)!;
+                    const bankQuestions = questions.filter(q => 
+                      q.subject === activeBank.subject && 
+                      q.unit === activeBank.unit && 
+                      q.topic === activeBank.topic
+                    );
+
+                    return (
+                      <div className="space-y-6">
+                        
+                        {/* Selected Question Bank Header Banner Card */}
+                        <div className="bg-white border border-outline rounded-3xl p-6 shadow-sm space-y-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-light-outline pb-4">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded">
+                                  LGS SORU BANKASI AKTİF GÖRÜNÜM
+                                </span>
+                                <span className="text-[10px] font-bold text-[#059669] bg-emerald-50 border border-emerald-100 px-2 py-0.2 rounded-full">
+                                  {bankQuestions.length} Soru Bulunmaktadır
+                                </span>
+                              </div>
+                              <h2 className="text-lg font-serif font-black text-primary leading-tight">
+                                {activeBank.subject} &gt; {activeBank.unit}
+                              </h2>
+                              <p className="text-xs text-on-surface-variant font-medium leading-relaxed">
+                                <strong>Kazanım Alt Konusu:</strong> {activeBank.topic}
+                              </p>
+                            </div>
+
+                            <button
+                              onClick={() => {
+                                if (showQuestionForm) {
+                                  setShowQuestionForm(false);
+                                  resetQuestionForm();
+                                } else {
+                                  resetQuestionForm();
+                                  setShowQuestionForm(true);
+                                }
+                              }}
+                              className="px-4 py-2.5 bg-primary hover:bg-neutral-800 text-white uppercase text-[10px] font-black tracking-widest rounded-xl shadow transition-all cursor-pointer flex items-center justify-center gap-1 shrink-0"
+                            >
+                              {showQuestionForm ? 'Formu Kapat' : '⁺ Bu Bankaya Soru Ekle'}
+                            </button>
                           </div>
 
-                          <p className="text-xs text-primary font-bold font-serif whitespace-pre-wrap leading-relaxed line-clamp-2">
-                            {q.text}
-                          </p>
+                          {/* Show Form if enabled */}
+                          {showQuestionForm && (
+                            <div className="bg-surface-dim/40 border border-outline rounded-2xl p-5 space-y-4 text-xs font-semibold">
+                              <h3 className="text-xs font-serif font-black pb-2 border-b border-outline flex justify-between items-center text-primary">
+                                <span>{editingQuestionId ? `Soruyu Düzenle (ID: ${editingQuestionId})` : 'Bu Soru Bankasına Soru Ekliyorsunuz'}</span>
+                                <span className="text-[10px] font-mono text-[#059669] uppercase font-bold">Hiyerarşi Otomatik Kilitlendi ✔</span>
+                              </h3>
 
-                          <div className="flex items-center gap-3 text-[10px] text-on-surface-variant font-semibold">
-                            <span>Seçenekler: {q.options.map(o => `${o.label}) ${o.value}`).join(' | ')}</span>
-                            <span className="text-emerald-700 font-black">✔ Doğru: {isCorrectOptionLabel}</span>
-                          </div>
+                              {/* Invisible preset fields message */}
+                              <div className="p-3 bg-slate-50 border border-slate-150 text-slate-800 rounded-xl leading-relaxed text-[11px] font-medium flex gap-2">
+                                <span className="font-mono text-slate-600 bg-neutral-200 p-0.5 px-1.5 rounded text-[9px] uppercase font-bold tracking-wider h-max shrink-0">KİLİTLİ</span>
+                                <div>
+                                  Bu soru otomatik olarak <strong>{activeBank.subject}</strong> dersi, <strong>{activeBank.unit}</strong> ünitesi ve <strong>{activeBank.topic}</strong> alt konusu kazanımı altına kaydedilecektir. Müfredat hiyerarşisi Soru Bankası üzerinden otomatik senkronize edilmiştir.
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                  <label className="text-primary block">Soru Zorluğu</label>
+                                  <select
+                                    value={qDifficulty}
+                                    onChange={(e) => setQDifficulty(e.target.value as Difficulty)}
+                                    className="w-full bg-white border border-outline rounded-xl p-3 focus:outline-none focus:border-primary text-primary font-bold"
+                                  >
+                                    <option value="Kolay">Kolay Seviye</option>
+                                    <option value="Orta">Orta Seviye</option>
+                                    <option value="Zor">Zor Seviye (Derece)</option>
+                                  </select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                  <label className="text-primary block">Sık Yapılan Hata Türü</label>
+                                  <input
+                                    type="text"
+                                    placeholder="Örn: Kural Karışıklığı, İşlem Hatası, Grafik Okuma"
+                                    value={qErrorType}
+                                    onChange={(e) => setQErrorType(e.target.value)}
+                                    className="w-full bg-white border border-outline rounded-xl p-3 focus:outline-none focus:border-primary text-primary font-bold"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <label className="text-primary block">Sorunun Başlangıç Bağlamı (Bağlam Alıntı / Tırnaklı İfade)</label>
+                                <input
+                                  type="text"
+                                  placeholder="Örn: 'Bir kenarı a birim olan kübün hacmi...'"
+                                  value={qContext}
+                                  onChange={(e) => setQContext(e.target.value)}
+                                  className="w-full bg-white border border-outline rounded-xl p-3 focus:outline-none focus:border-primary text-primary font-medium"
+                                />
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <label className="text-primary block">Soru Ana Metni (Soru Senaryosu / Gelişmiş Hikaye)</label>
+                                <textarea
+                                  rows={3}
+                                  placeholder="Sorunun senaryosunu, sayısal veya sözel hikayesini girin..."
+                                  value={qText}
+                                  onChange={(e) => setQText(e.target.value)}
+                                  className="w-full bg-white border border-outline rounded-xl p-3 focus:outline-none focus:border-primary text-primary font-medium resize-none leading-relaxed"
+                                />
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <label className="text-primary block">Soru Soru Kökü (Soru Sorusu - 'Buna göre bu kartların toplamı kaç olur?')</label>
+                                <input
+                                  type="text"
+                                  placeholder="Soruda neyin istendiğini belirten net query kökünü girin..."
+                                  value={qQuery}
+                                  onChange={(e) => setQQuery(e.target.value)}
+                                  className="w-full bg-white border border-outline rounded-xl p-3 focus:outline-none focus:border-primary text-primary font-medium"
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <label className="text-primary block">Şıklar & Seçenekler</label>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="flex items-center gap-2 bg-white border border-outline p-2 rounded-xl">
+                                    <span className="w-6 h-6 rounded-md bg-neutral-100 text-neutral-800 flex items-center justify-center font-bold font-mono text-xs shrink-0">A</span>
+                                    <input
+                                      type="text"
+                                      placeholder="A Seçeneği"
+                                      value={optA}
+                                      onChange={(e) => setOptA(e.target.value)}
+                                      className="flex-1 bg-transparent p-1 px-2.5 outline-none border-none text-primary font-bold focus:ring-0 text-xs"
+                                    />
+                                  </div>
+
+                                  <div className="flex items-center gap-2 bg-white border border-outline p-2 rounded-xl">
+                                    <span className="w-6 h-6 rounded-md bg-neutral-100 text-neutral-800 flex items-center justify-center font-bold font-mono text-xs shrink-0">B</span>
+                                    <input
+                                      type="text"
+                                      placeholder="B Seçeneği"
+                                      value={optB}
+                                      onChange={(e) => setOptB(e.target.value)}
+                                      className="flex-1 bg-transparent p-1 px-2.5 outline-none border-none text-primary font-bold focus:ring-0 text-xs"
+                                    />
+                                  </div>
+
+                                  <div className="flex items-center gap-2 bg-white border border-outline p-2 rounded-xl">
+                                    <span className="w-6 h-6 rounded-md bg-neutral-100 text-neutral-800 flex items-center justify-center font-bold font-mono text-xs shrink-0">C</span>
+                                    <input
+                                      type="text"
+                                      placeholder="C Seçeneği"
+                                      value={optC}
+                                      onChange={(e) => setOptC(e.target.value)}
+                                      className="flex-1 bg-transparent p-1 px-2.5 outline-none border-none text-primary font-bold focus:ring-0 text-xs"
+                                    />
+                                  </div>
+
+                                  <div className="flex items-center gap-2 bg-white border border-outline p-2 rounded-xl">
+                                    <span className="w-6 h-6 rounded-md bg-neutral-100 text-neutral-800 flex items-center justify-center font-bold font-mono text-xs shrink-0">D</span>
+                                    <input
+                                      type="text"
+                                      placeholder="D Seçeneği"
+                                      value={optD}
+                                      onChange={(e) => setOptD(e.target.value)}
+                                      className="flex-1 bg-transparent p-1 px-2.5 outline-none border-none text-primary font-bold focus:ring-0 text-xs"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                  <label className="text-primary block">Doğru Şık Hangisi?</label>
+                                  <select
+                                    value={correctOption}
+                                    onChange={(e) => setCorrectOption(e.target.value as 'A' | 'B' | 'C' | 'D')}
+                                    className="w-full bg-white border border-outline rounded-xl p-3 focus:outline-none focus:border-primary text-emerald-700 font-bold"
+                                  >
+                                    <option value="A">A şıkkı doğru cevap</option>
+                                    <option value="B">B şıkkı doğru cevap</option>
+                                    <option value="C">C şıkkı doğru cevap</option>
+                                    <option value="D">D şıkkı doğru cevap</option>
+                                  </select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                  <label className="text-primary block">Süreç İpucu (Socrates Hint / Geri Bildirim)</label>
+                                  <input
+                                    type="text"
+                                    placeholder="Örn: Sorudaki katsayıyı parçalamak iyi bir başlangıç olabilir..."
+                                    value={qHint}
+                                    onChange={(e) => setQHint(e.target.value)}
+                                    className="w-full bg-white border border-outline rounded-xl p-3 focus:outline-none focus:border-primary text-primary font-medium"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <label className="text-primary block flex items-center gap-1">
+                                  <span>Görsel İpucu URL (Grafikler, Geometrik Şekiller vb.)</span>
+                                  <span className="font-normal italic text-on-surface-variant/70 text-[10px]">(İsteğe bağlı)</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="Örn: https://images.unsplash.com/... veya lokal görsel yolu"
+                                  value={qImageUrl}
+                                  onChange={(e) => setQImageUrl(e.target.value)}
+                                  className="w-full bg-white border border-outline rounded-xl p-3 focus:outline-none focus:border-primary text-primary font-medium"
+                                />
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <label className="text-primary block">Öğrenci Hatalı Cevap Verdiğinde Sunulacak Çözüm Analizi</label>
+                                <textarea
+                                  rows={2}
+                                  placeholder="Öğrenci bu sık yapılan hataya düştüğünde Sokrates mentoru asistanı tarafından fısıldanacak açıklayıcı ve yapıcı analiz..."
+                                  value={qErrorAnalysis}
+                                  onChange={(e) => setQErrorAnalysis(e.target.value)}
+                                  className="w-full bg-white border border-outline rounded-xl p-3 focus:outline-none focus:border-primary text-primary font-medium resize-none leading-relaxed"
+                                />
+                              </div>
+
+                              <div className="flex justify-end gap-2 pt-2 border-t border-outline">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowQuestionForm(false);
+                                    resetQuestionForm();
+                                  }}
+                                  className="px-4 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-primary uppercase font-bold text-[10px] tracking-wider rounded-xl transition-all cursor-pointer"
+                                >
+                                  VAZGEÇ / TEMİZLE
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleSaveQuestion}
+                                  className="px-5 py-2.5 bg-[#059669] hover:bg-emerald-700 text-white uppercase font-bold text-[10px] tracking-wider rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                                >
+                                  <Save size={14} />
+                                  <span>{editingQuestionId ? 'Değişiklikleri Kaydet' : 'Soruyu Soru Bankasına Ekle'}</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
 
-                        {/* Soru Aksiyonları */}
-                        <div className="flex gap-1.5 shrink-0 self-center">
-                          <button
-                            onClick={() => {
-                              setCurrentQuestion(q);
-                              addLog('info', 'SELECT_QUESTION', `Aktif soru "${q.id}" olarak değiştirildi.`);
-                            }}
-                            title="Çalışma Ekranında Önizle"
-                            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-150 p-2 rounded-lg transition-all text-[11px] font-bold cursor-pointer"
-                          >
-                            Önizle
-                          </button>
-                          <button
-                            onClick={() => selectQuestionForEdit(q)}
-                            title="Düzenle"
-                            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-150 p-2 rounded-lg transition-all text-[11px] font-bold cursor-pointer"
-                          >
-                            Düzenle
-                          </button>
-                          <button
-                            onClick={() => handleDeleteQuestion(q.id)}
-                            title="Kalıcı Olarak Sil"
-                            className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-150 p-2 rounded-lg transition-all text-[11px] font-bold cursor-pointer"
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                        {/* List of questions in active bank */}
+                        <div className="bg-white border border-outline rounded-3xl p-6 shadow-sm space-y-4">
+                          <h3 className="font-serif font-black text-lg text-primary border-b border-light-outline pb-2">
+                            Bankadaki Sorular ({bankQuestions.length} Soru)
+                          </h3>
+
+                          <div className="space-y-3">
+                            {bankQuestions.map((q) => {
+                              const isCorrectOptionLabel = q.options.find(o => o.isCorrect)?.label;
+                              return (
+                                <div
+                                  key={q.id}
+                                  className={`p-4 border rounded-2xl flex flex-col sm:flex-row items-start justify-between gap-4 transition-all hover:bg-neutral-50/25 ${
+                                    currentQuestion && currentQuestion.id === q.id 
+                                      ? 'border-primary bg-primary/[0.01] shadow-sm' 
+                                      : 'border-outline bg-white'
+                                  }`}
+                                >
+                                  <div className="space-y-1.5 flex-1 min-w-0 text-left">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="bg-neutral-100 border border-neutral-200 text-neutral-800 font-mono font-bold text-[10px] px-2 py-0.5 rounded">
+                                        Soru #{q.id}
+                                      </span>
+                                      {q.imageUrl && (
+                                        <span className="bg-sky-50 border border-sky-150 text-sky-700 font-mono font-bold text-[10px] px-2 py-0.5 rounded flex items-center gap-1" title="Görsel İpucu Mevcut">
+                                          <Image size={10} className="text-sky-600" />
+                                          <span>Görsel İpucu</span>
+                                        </span>
+                                      )}
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                        q.difficulty === 'Zor' 
+                                          ? 'bg-rose-50 border border-rose-100 text-rose-600' 
+                                          : q.difficulty === 'Orta' 
+                                          ? 'bg-indigo-50 border border-indigo-100 text-indigo-600' 
+                                          : 'bg-emerald-50 border border-emerald-100 text-emerald-600'
+                                      }`}>
+                                        {q.difficulty}
+                                      </span>
+                                      <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">
+                                        Hata: {q.errorType}
+                                      </span>
+                                    </div>
+
+                                    <p className="text-xs text-primary font-bold font-serif whitespace-pre-wrap leading-relaxed line-clamp-3">
+                                      {q.text}
+                                    </p>
+
+                                    <div className="flex items-center gap-3 text-[10px] text-on-surface-variant font-semibold">
+                                      <span>Seçenekler: {q.options.map(o => `${o.label}) ${o.value}`).join(' | ')}</span>
+                                      <span className="text-emerald-700 font-black">✔ Doğru: {isCorrectOptionLabel}</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Soru Aksiyonları */}
+                                  <div className="flex gap-1.5 shrink-0 self-center">
+                                    <button
+                                      onClick={() => {
+                                        setCurrentQuestion(q);
+                                        addLog('info', 'SELECT_QUESTION', `Aktif önizleme sorusu "${q.id}" olarak değiştirildi.`);
+                                      }}
+                                      title="Öğrenci Ekranında Önizle"
+                                      className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-150 p-2 py-1.5 rounded-lg transition-all text-[11px] font-bold cursor-pointer"
+                                    >
+                                      Önizle
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        selectQuestionForEdit(q);
+                                        setShowQuestionForm(true);
+                                      }}
+                                      title="Düzenle"
+                                      className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-150 p-2 py-1.5 rounded-lg transition-all text-[11px] font-bold cursor-pointer"
+                                    >
+                                      Düzenle
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteQuestion(q.id)}
+                                      title="Kalıcı Olarak Sil"
+                                      className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-150 p-2 py-1.5 rounded-lg transition-all text-[11px] font-bold cursor-pointer"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </div>
+
+                                </div>
+                              );
+                            })}
+
+                            {bankQuestions.length === 0 && (
+                              <div className="p-12 text-center border border-dashed border-outline bg-neutral-50/20 rounded-2xl space-y-2">
+                                <Plus size={20} className="text-[#059669] mx-auto opacity-70" />
+                                <h4 className="text-xs font-serif font-black text-primary">Soru Bankası Henüz Boş</h4>
+                                <p className="text-[11px] text-on-surface-variant max-w-xs mx-auto leading-relaxed">
+                                  Hemen sağ üstte yer alan <strong>"Bu Bankaya Soru Ekle"</strong> butonuna tıklayarak ilk özgün LGS sorusunu tanımlayabilirsiniz.
+                                </p>
+                              </div>
+                            )}
+                          </div>
                         </div>
 
                       </div>
                     );
-                  })}
+                  })()}
+
                 </div>
 
               </div>
+              
             </div>
           )}
 
@@ -1104,10 +2022,14 @@ export default function AdminView({
 
                       <button
                         onClick={() => {
-                          if (confirm('Tüm soru çözme istatistiklerini temizlemek istediğinizden emin misiniz?')) {
-                            setSolveHistory([]);
-                            addLog('warn', 'SIMULATION', 'Tüm soru çözme istatistikleri sıfırlandı.');
-                          }
+                          triggerConfirm(
+                            'İstatistikleri Sıfırla',
+                            'Tüm soru çözme istatistiklerini temizlemek istediğinizden emin misiniz?',
+                            () => {
+                              setSolveHistory([]);
+                              addLog('warn', 'SIMULATION', 'Tüm soru çözme istatistikleri sıfırlandı.');
+                            }
+                          );
                         }}
                         className="w-full py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-[10px] uppercase font-black tracking-wider text-center cursor-pointer"
                       >
@@ -1657,6 +2579,547 @@ export default function AdminView({
             </div>
           )}
 
+          {/* 9. MANUAL CURRICULUM FILTERS COORD PANEL (HIERARCHICAL DESIGN) */}
+          {adminTab === 'mufredat' && (
+            <div className="space-y-6">
+              {/* Header Info Block with Publish Action */}
+              <div className="bg-white border border-outline rounded-3xl p-6 shadow-sm space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-light-outline">
+                  <div className="flex items-center gap-2">
+                    <LayoutGrid size={18} className="text-[#059669]" />
+                    <h2 className="text-lg font-serif font-black text-primary">Hiyerarşik Müfredat (Ders, Ünite, Alt Konu) Yönetimi</h2>
+                  </div>
+                  
+                  {/* Sitede Yayınla & Güncelle Action Button */}
+                  <button
+                    onClick={handlePublishSyllabus}
+                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black uppercase text-[10px] sm:text-[11px] tracking-wider px-5 py-2.5 rounded-2xl shadow-lg shadow-emerald-600/10 transition-all cursor-pointer"
+                  >
+                    <RefreshCw size={14} className="animate-spin-slow text-white" />
+                    Sitede Yayınla & Güncelle
+                  </button>
+                </div>
+                
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  LGS Hazırlık müfredatınızı sırasıyla <strong>Dersler</strong>, bu derslere ait <strong>Üniteler</strong> ve ünitelerin altındaki <strong>Alt Konular (Kazanımlar)</strong> hiyerarşisine uygun olarak tamamen bağımsız yönetebilirsiniz. Bu yapıda yaptığınız her ekleme, çıkarma ve sıralama değişikliğinin sitede aktif olması için <strong>"Sitede Yayınla & Güncelle"</strong> butonuna basmanız yeterlidir.
+                </p>
+              </div>
+ 
+              {/* Four-Column Interactive Layout */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+ 
+                {/* 1. DERS EKLEME & SİLME */}
+                <div className="bg-white border border-outline rounded-3xl p-5 shadow-sm flex flex-col space-y-4">
+                  <div className="pb-2 border-b border-outline">
+                    <h3 className="text-xs font-black uppercase tracking-widest text-[#059669] flex items-center justify-between">
+                      <span>1. Ders Listesi</span>
+                      <span className="text-[10px] bg-emerald-50 text-[#059669] px-2 py-0.5 rounded-full font-mono font-bold">
+                        {Array.from(new Set(syllabus.map(s => s.subject).filter(Boolean))).length} Ders
+                      </span>
+                    </h3>
+                  </div>
+ 
+                  {/* Add Course Form */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-primary font-bold block uppercase tracking-wider">Yeni Ders Ekle</label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="Örn: İngilizce, Din Kültürü"
+                        value={newDersInput}
+                        onChange={(e) => setNewDersInput(e.target.value)}
+                        className="flex-1 bg-surface-dim border border-outline rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-[#059669] text-primary font-bold"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleAddDers(newDersInput);
+                            setNewDersInput('');
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={() => {
+                          handleAddDers(newDersInput);
+                          setNewDersInput('');
+                        }}
+                        className="px-3 bg-[#059669] hover:bg-emerald-700 text-white rounded-xl flex items-center justify-center transition-all cursor-pointer"
+                        title="Ders Ekle"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                  </div>
+ 
+                  {/* Course List Scrollable */}
+                  <div className="flex-1 overflow-y-auto max-h-80 border border-outline rounded-xl divide-y divide-outline bg-surface-bright">
+                    {(Array.from(new Set(syllabus.map(s => s.subject).filter(Boolean))) as string[]).map((ders, index, arr) => {
+                      const isActive = selectedMufredatDers === ders;
+                      return (
+                        <div
+                          key={ders}
+                          onClick={() => {
+                            setSelectedMufredatDers(ders);
+                            setSelectedMufredatUnite('');
+                            setSelectedMufredatTopic('');
+                          }}
+                          className={`p-3 flex items-center justify-between gap-2 cursor-pointer transition-colors text-xs font-bold ${
+                            isActive ? 'bg-[#059669]/10 text-[#059669] border-l-4 border-l-[#059669]' : 'text-primary hover:bg-neutral-50'
+                          }`}
+                        >
+                          <span className="truncate flex-1">{ders}</span>
+                          
+                          {/* Reordering and deleting buttons */}
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMoveDers(ders, 'up');
+                              }}
+                              disabled={index === 0}
+                              className={`p-1 hover:bg-neutral-100 rounded transition-colors ${index === 0 ? 'opacity-30 cursor-not-allowed' : 'text-primary'}`}
+                              title="Yukarı Taşı"
+                            >
+                              <ChevronUp size={14} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMoveDers(ders, 'down');
+                              }}
+                              disabled={index === arr.length - 1}
+                              className={`p-1 hover:bg-neutral-100 rounded transition-colors ${index === arr.length - 1 ? 'opacity-30 cursor-not-allowed' : 'text-primary'}`}
+                              title="Aşağı Taşı"
+                            >
+                              <ChevronDown size={14} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveDers(ders);
+                              }}
+                              className="p-1 text-rose-500 hover:bg-rose-50 hover:text-rose-700 rounded-lg transition-colors cursor-pointer"
+                              title="Dersi Sil"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {Array.from(new Set(syllabus.map(s => s.subject).filter(Boolean))).length === 0 && (
+                      <div className="p-4 text-center text-[11px] text-on-surface-variant font-medium">Tebrikler, henüz hiç ders eklenmemiş.</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. DERSE GÖRE ÜNİTE EKLEME & SİLME */}
+                <div className="bg-white border border-outline rounded-3xl p-5 shadow-sm flex flex-col space-y-4">
+                  <div className="pb-2 border-b border-outline">
+                    <h3 className="text-xs font-black uppercase tracking-widest text-[#059669] flex items-center justify-between">
+                      <span>2. Üniteler</span>
+                      {selectedMufredatDers && (
+                        <span className="text-[10px] bg-emerald-50 text-[#059669] px-2 py-0.5 rounded-full font-mono font-bold">
+                          {Array.from(new Set(syllabus.filter(s => s.subject === selectedMufredatDers).map(s => s.unit).filter(Boolean))).length} Ünite
+                        </span>
+                      )}
+                    </h3>
+                  </div>
+
+                  {!selectedMufredatDers ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center p-6 border border-dashed border-outline rounded-xl bg-neutral-50/50 space-y-1">
+                      <LayoutGrid size={18} className="text-on-surface-variant/50" />
+                      <p className="text-[11px] text-on-surface-variant font-bold leading-normal">Lütfen soldan bir Ders seçin.</p>
+                      <p className="text-[9px] text-on-surface-variant/75">Seçtiğiniz derse ait üniteleri yönetebilirsiniz.</p>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex flex-col space-y-4">
+                      {/* Add Unit Form */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] text-primary font-bold block uppercase tracking-wider">
+                          "{selectedMufredatDers}" Dersine Ünite Ekle
+                        </label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            placeholder="Örn: Friendship, DNA ve Genetik"
+                            value={newUniteInput}
+                            onChange={(e) => setNewUniteInput(e.target.value)}
+                            className="flex-1 bg-surface-dim border border-outline rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-[#059669] text-primary font-bold"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleAddUnite(selectedMufredatDers, newUniteInput);
+                                setNewUniteInput('');
+                              }
+                            }}
+                          />
+                          <button
+                            onClick={() => {
+                              handleAddUnite(selectedMufredatDers, newUniteInput);
+                              setNewUniteInput('');
+                            }}
+                            className="px-3 bg-[#059669] hover:bg-emerald-700 text-white rounded-xl flex items-center justify-center transition-all cursor-pointer"
+                            title="Ünite Ekle"
+                          >
+                            <Plus size={16} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Unit Scrollable List */}
+                      <div className="flex-1 overflow-y-auto max-h-64 border border-outline rounded-xl divide-y divide-outline bg-surface-bright">
+                        {(Array.from(new Set(syllabus.filter(s => s.subject === selectedMufredatDers).map(s => s.unit).filter(Boolean))) as string[]).map((unite, index, arr) => {
+                          const isActive = selectedMufredatUnite === unite;
+                          return (
+                            <div
+                              key={unite}
+                              onClick={() => {
+                                setSelectedMufredatUnite(unite);
+                                setSelectedMufredatTopic('');
+                              }}
+                              className={`p-3 flex items-center justify-between gap-2 cursor-pointer transition-colors text-xs font-bold ${
+                                isActive ? 'bg-[#059669]/10 text-[#059669] border-l-4 border-l-[#059669]' : 'text-primary hover:bg-neutral-50'
+                              }`}
+                            >
+                              <span className="truncate flex-1">{unite}</span>
+                              
+                              {/* Reordering and deleting buttons */}
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleMoveUnite(selectedMufredatDers, unite, 'up');
+                                  }}
+                                  disabled={index === 0}
+                                  className={`p-1 hover:bg-neutral-100 rounded transition-colors ${index === 0 ? 'opacity-30 cursor-not-allowed' : 'text-primary'}`}
+                                  title="Yukarı Taşı"
+                                >
+                                  <ChevronUp size={14} />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleMoveUnite(selectedMufredatDers, unite, 'down');
+                                  }}
+                                  disabled={index === arr.length - 1}
+                                  className={`p-1 hover:bg-neutral-100 rounded transition-colors ${index === arr.length - 1 ? 'opacity-30 cursor-not-allowed' : 'text-primary'}`}
+                                  title="Aşağı Taşı"
+                                >
+                                  <ChevronDown size={14} />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveUnite(selectedMufredatDers, unite);
+                                  }}
+                                  className="p-1 text-rose-500 hover:bg-rose-50 hover:text-rose-700 rounded-lg transition-colors cursor-pointer"
+                                  title="Üniteyi Sil"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {Array.from(new Set(syllabus.filter(s => s.subject === selectedMufredatDers).map(s => s.unit).filter(Boolean))).length === 0 && (
+                          <div className="p-4 text-center text-[10px] text-on-surface-variant font-semibold">Bu derse ait henüz bir ünite tanımlanmamış.</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. ÜNİTEYE GÖRE ALT KONU EKLEME & SİLME */}
+                <div className="bg-white border border-outline rounded-3xl p-5 shadow-sm flex flex-col space-y-4">
+                  <div className="pb-2 border-b border-outline">
+                    <h3 className="text-xs font-black uppercase tracking-widest text-[#059669] flex items-center justify-between">
+                      <span>3. Alt Konular</span>
+                      {selectedMufredatDers && selectedMufredatUnite && (
+                        <span className="text-[10px] bg-emerald-50 text-[#059669] px-2 py-0.5 rounded-full font-mono font-bold">
+                          {Array.from(new Set(syllabus.filter(s => s.subject === selectedMufredatDers && s.unit === selectedMufredatUnite).map(s => s.topic).filter(Boolean))).length} Konu
+                        </span>
+                      )}
+                    </h3>
+                  </div>
+
+                  {(!selectedMufredatDers || !selectedMufredatUnite) ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center p-6 border border-dashed border-outline rounded-xl bg-neutral-50/50 space-y-1">
+                      <LayoutGrid size={18} className="text-on-surface-variant/50" />
+                      <p className="text-[11px] text-on-surface-variant font-bold leading-normal">Lütfen soldan Ders ve Ünite seçin.</p>
+                      <p className="text-[9px] text-on-surface-variant/75">Grup altındaki alt konu kazanımlarını silebilir veya ekleyebilirsiniz.</p>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex flex-col space-y-4">
+                      {/* Add Topic Form */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] text-primary font-bold block uppercase tracking-wider">
+                          "{selectedMufredatUnite}" Ünitesine Alt Konu Ekle
+                        </label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            placeholder="Örn: Accept and refuse invitations"
+                            value={newTopicInput}
+                            onChange={(e) => setNewTopicInput(e.target.value)}
+                            className="flex-1 bg-surface-dim border border-outline rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-[#059669] text-primary font-bold"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleAddTopic(selectedMufredatDers, selectedMufredatUnite, newTopicInput);
+                                setNewTopicInput('');
+                              }
+                            }}
+                          />
+                          <button
+                            onClick={() => {
+                              handleAddTopic(selectedMufredatDers, selectedMufredatUnite, newTopicInput);
+                              setNewTopicInput('');
+                            }}
+                            className="px-3 bg-[#059669] hover:bg-emerald-700 text-white rounded-xl flex items-center justify-center transition-all cursor-pointer"
+                            title="Alt Konu Ekle"
+                          >
+                            <Plus size={16} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Topic Scrollable List */}
+                      <div className="flex-1 overflow-y-auto max-h-64 border border-outline rounded-xl divide-y divide-outline bg-surface-bright">
+                        {(Array.from(new Set(syllabus.filter(s => s.subject === selectedMufredatDers && s.unit === selectedMufredatUnite).map(s => s.topic).filter(Boolean))) as string[]).map((topic, index, arr) => {
+                          const isTopicActive = selectedMufredatTopic === topic;
+                          return (
+                            <div
+                              key={topic}
+                              onClick={() => setSelectedMufredatTopic(topic)}
+                              className={`p-3 flex items-center justify-between gap-2 cursor-pointer transition-colors text-xs font-bold ${
+                                isTopicActive ? 'bg-[#059669]/10 text-[#059669] border-l-4 border-l-[#059669]' : 'text-primary hover:bg-neutral-50 bg-neutral-50/20'
+                              }`}
+                            >
+                              <span className="truncate flex-1 leading-relaxed font-semibold">{topic}</span>
+                              
+                              {/* Reordering and deleting buttons for Topic */}
+                              <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  onClick={() => handleMoveTopic(selectedMufredatDers, selectedMufredatUnite, topic, 'up')}
+                                  disabled={index === 0}
+                                  className={`p-1 hover:bg-neutral-100 rounded transition-colors ${index === 0 ? 'opacity-30 cursor-not-allowed' : 'text-primary'}`}
+                                  title="Yukarı Taşı"
+                                >
+                                  <ChevronUp size={14} />
+                                </button>
+                                <button
+                                  onClick={() => handleMoveTopic(selectedMufredatDers, selectedMufredatUnite, topic, 'down')}
+                                  disabled={index === arr.length - 1}
+                                  className={`p-1 hover:bg-neutral-100 rounded transition-colors ${index === arr.length - 1 ? 'opacity-30 cursor-not-allowed' : 'text-primary'}`}
+                                  title="Aşağı Taşı"
+                                >
+                                  <ChevronDown size={14} />
+                                </button>
+                                <button
+                                  onClick={() => handleRemoveTopic(selectedMufredatDers, selectedMufredatUnite, topic)}
+                                  className="p-1 text-rose-500 hover:bg-rose-50 hover:text-rose-700 rounded-lg transition-colors cursor-pointer shrink-0"
+                                  title="Alt Konuyu Sil"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {Array.from(new Set(syllabus.filter(s => s.subject === selectedMufredatDers && s.unit === selectedMufredatUnite).map(s => s.topic).filter(Boolean))).length === 0 && (
+                          <div className="p-4 text-center text-[10px] text-on-surface-variant font-semibold">Bu üniteye ait henüz bir alt konu tanımlanmamış.</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. SORU BANKALARI YÖNETİMİ */}
+                <div className="bg-white border border-outline rounded-3xl p-5 shadow-sm flex flex-col space-y-4">
+                  <div className="pb-2 border-b border-outline">
+                    <h3 className="text-xs font-black uppercase tracking-widest text-[#059669] flex items-center justify-between">
+                      <span>4. Soru Bankaları</span>
+                      {selectedMufredatDers && selectedMufredatUnite && selectedMufredatTopic && (
+                        <span className="text-[10px] bg-emerald-50 text-[#059669] px-2 py-0.5 rounded-full font-mono font-bold font-serif">
+                          {questionBanks.filter(b => b.subject === selectedMufredatDers && b.unit === selectedMufredatUnite && b.topic === selectedMufredatTopic).length} Banka
+                        </span>
+                      )}
+                    </h3>
+                  </div>
+
+                  {(!selectedMufredatDers || !selectedMufredatUnite || !selectedMufredatTopic) ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center p-6 border border-dashed border-outline rounded-xl bg-neutral-50/50 space-y-1">
+                      <LayoutGrid size={18} className="text-on-surface-variant/50" />
+                      <p className="text-[11px] text-on-surface-variant font-bold leading-normal">Lütfen soldan Alt Konu seçin.</p>
+                      <p className="text-[9px] text-on-surface-variant/75">Seçtiğiniz kazanımın altındaki soru bankalarını yönetebilirsiniz.</p>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex flex-col space-y-4">
+                      {/* Add bank form */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] text-primary font-bold block uppercase tracking-wider">
+                          Soru Bankası Tanımla (İsim Ver)
+                        </label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            placeholder="Zor Seviye 1. Soru Bankası"
+                            value={newBankNameInput}
+                            onChange={(e) => setNewBankNameInput(e.target.value)}
+                            className="flex-1 bg-surface-dim border border-outline rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-[#059669] text-primary font-bold"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleAddHierarchicalBank(selectedMufredatDers, selectedMufredatUnite, selectedMufredatTopic, newBankNameInput);
+                                setNewBankNameInput('');
+                              }
+                            }}
+                          />
+                          <button
+                            onClick={() => {
+                              handleAddHierarchicalBank(selectedMufredatDers, selectedMufredatUnite, selectedMufredatTopic, newBankNameInput);
+                              setNewBankNameInput('');
+                            }}
+                            className="px-3 bg-[#059669] hover:bg-emerald-700 text-white rounded-xl flex items-center justify-center transition-all cursor-pointer"
+                            title="Soru Bankası Tanımla"
+                          >
+                            <Plus size={16} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Question Banks List Scrollable */}
+                      <div className="flex-1 overflow-y-auto max-h-64 border border-outline rounded-xl divide-y divide-outline bg-surface-bright">
+                        {questionBanks
+                          .filter(b => b.subject === selectedMufredatDers && b.unit === selectedMufredatUnite && b.topic === selectedMufredatTopic)
+                          .map((bank) => {
+                            const isEditing = editingBankId === bank.id;
+                            const bankCount = questions.filter(q => 
+                              q.subject === bank.subject && 
+                              q.unit === bank.unit && 
+                              q.topic === bank.topic
+                            ).length;
+                            const isSelected = selectedBankId === bank.id;
+
+                            return (
+                              <div
+                                key={bank.id}
+                                className={`p-3 flex flex-col gap-2 text-xs transition-all ${
+                                  isSelected ? 'bg-primary/5 border-l-4 border-l-primary' : 'hover:bg-neutral-50 bg-neutral-50/10'
+                                }`}
+                              >
+                                {isEditing ? (
+                                  <div className="flex items-center gap-1.5 w-full">
+                                    <input
+                                      type="text"
+                                      value={editingBankNameVal}
+                                      onChange={(e) => setEditingBankNameVal(e.target.value)}
+                                      className="flex-1 bg-white border border-outline rounded-lg px-2 py-1 text-xs font-bold text-primary"
+                                      autoFocus
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          handleEditBankName(bank.id, editingBankNameVal);
+                                          setEditingBankId(null);
+                                        } else if (e.key === 'Escape') {
+                                          setEditingBankId(null);
+                                        }
+                                      }}
+                                    />
+                                    <button
+                                      onClick={() => {
+                                        handleEditBankName(bank.id, editingBankNameVal);
+                                        setEditingBankId(null);
+                                      }}
+                                      className="p-1 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors cursor-pointer"
+                                      title="Tamam"
+                                    >
+                                      <Check size={14} />
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingBankId(null)}
+                                      className="p-1 text-rose-500 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors cursor-pointer"
+                                      title="Vazgeç"
+                                    >
+                                      <X size={14} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="space-y-1">
+                                      <h4 className="font-serif font-black text-primary leading-tight text-[11px]">{bank.name || 'İsimsiz Soru Bankası'}</h4>
+                                      <div className="flex items-center gap-2 text-[9px] text-on-surface-variant/80 font-medium">
+                                        <span>{bankCount} Soru</span>
+                                        <span>•</span>
+                                        <span>Eklendi: {bank.createdAt || 'Varsayılan'}</span>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <button
+                                        onClick={() => {
+                                          setEditingBankId(bank.id);
+                                          setEditingBankNameVal(bank.name || '');
+                                        }}
+                                        className="p-1 text-[#059669] hover:bg-emerald-50 rounded-lg transition-all cursor-pointer"
+                                        title="Soru Bankası İsmini Düzenle"
+                                      >
+                                        <Edit2 size={12} />
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          if (confirm('Bu soru bankasını silmek istediğinize emin misiniz? Soru bankasının kendisi silinecektir.')) {
+                                            const updated = questionBanks.filter(b => b.id !== bank.id);
+                                            saveQuestionBanks(updated);
+                                            if (selectedBankId === bank.id) {
+                                              localStorage.removeItem('lgs_selected_bank_id');
+                                              setSelectedBankId(null);
+                                            }
+                                            addLog('warn', 'QUESTION_BANK', `Soru bankası kaldırıldı: ${bank.name}`);
+                                          }
+                                        }}
+                                        className="p-1 text-rose-500 hover:bg-rose-50 hover:text-rose-700 rounded-lg transition-colors cursor-pointer"
+                                        title="Soru Bankasını Sil"
+                                      >
+                                        <Trash2 size={12} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div className="flex items-center justify-between gap-2 pt-1 border-t border-outline/30" onClick={(e) => e.stopPropagation()}>
+                                  <span className="text-[9px] font-bold text-[#059669]/90 bg-emerald-50 px-1.5 py-0.5 rounded">Aktif Sınav Katmanı</span>
+                                  {isSelected ? (
+                                    <span className="text-[10px] text-emerald-600 font-extrabold flex items-center gap-0.5">
+                                      <Check size={12} />
+                                      Seçili
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        localStorage.setItem('lgs_selected_bank_id', bank.id);
+                                        setSelectedBankId(bank.id);
+                                        addLog('success', 'QUESTION_BANK', `Soru bankası aktif seçildi: ${bank.name}`);
+                                        // Reset current workspace question bank to 1st question!
+                                        window.dispatchEvent(new Event('lgs_syllabus_updated'));
+                                      }}
+                                      className="text-[9px] uppercase font-black tracking-wider text-primary bg-surface-dim hover:bg-neutral-100 border border-outline px-2 py-1 rounded-lg cursor-pointer transition-all"
+                                    >
+                                      Sitede Aktif Et
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                        {questionBanks.filter(b => b.subject === selectedMufredatDers && b.unit === selectedMufredatUnite && b.topic === selectedMufredatTopic).length === 0 && (
+                          <div className="p-4 text-center text-[10px] text-on-surface-variant font-semibold">Bu konuya ait henüz bir soru bankası tanımlanmamış.</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          )}
+
         </div>
 
         {/* Dynamic Sidebar Info Widget Panel */}
@@ -1689,5 +3152,65 @@ export default function AdminView({
       </div>
 
     </div>
+
+    <AnimatePresence>
+      {modalConfig && modalConfig.isOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setModalConfig(null)}
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+          />
+          
+          {/* Modal Body */}
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0, y: 15 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.95, opacity: 0, y: 15 }}
+            transition={{ type: 'spring', duration: 0.3 }}
+            className="relative w-full max-w-md bg-white border border-outline rounded-3xl p-6 shadow-2xl space-y-5 text-left overflow-hidden z-10"
+          >
+            {/* Header */}
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-rose-50 border border-rose-100 rounded-2xl text-rose-600 shrink-0">
+                <AlertCircle size={24} />
+              </div>
+              <div className="space-y-1 flex-1 min-w-0">
+                <h3 className="text-sm sm:text-base font-serif font-black text-primary leading-snug">
+                  {modalConfig.title}
+                </h3>
+                <p className="text-xs text-on-surface-variant font-medium leading-relaxed whitespace-pre-wrap">
+                  {modalConfig.message}
+                </p>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-light-outline">
+              <button
+                type="button"
+                onClick={() => setModalConfig(null)}
+                className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-primary font-bold uppercase text-[10px] tracking-wider rounded-xl transition-all cursor-pointer"
+              >
+                {modalConfig.cancelLabel || (modalConfig.type === 'confirm' ? 'Hayır' : 'Kapat')}
+              </button>
+              {modalConfig.type === 'confirm' && modalConfig.onConfirm && (
+                <button
+                  type="button"
+                  onClick={modalConfig.onConfirm}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase text-[10px] tracking-wider rounded-xl shadow-md transition-all cursor-pointer"
+                >
+                  {modalConfig.confirmLabel || 'Evet'}
+                </button>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+    </>
   );
 }
