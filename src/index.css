@@ -66,3 +66,108 @@
     opacity: 1;
   }
 }
+
+/* Container-based responsive fixes for compact/simulator viewports */
+.app-view-container {
+  container-type: inline-size;
+}
+
+@container (max-width: 600px) {
+  /* KPI metrics summary cards stacking */
+  .app-view-container .kpi-grid {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+  }
+
+  /* Radar chart card layout stacking */
+  .app-view-container .radar-grid {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+  }
+  .app-view-container .radar-grid .lg\:col-span-5 {
+    grid-column: span 1 / span 1 !important;
+  }
+  .app-view-container .radar-grid .lg\:col-span-7 {
+    grid-column: span 1 / span 1 !important;
+    height: 290px !important;
+  }
+
+  /* Success & Weekly charts grid stacking */
+  .app-view-container .charts-grid {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+  }
+
+  /* Folders library card grid flow */
+  .app-view-container .folders-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  /* Quick Search & Format Tag Filters alignment and wrapping */
+  .app-view-container .filters-flex {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+  .app-view-container .filters-flex > div:first-child {
+    width: 100% !important;
+  }
+  .app-view-container .filters-flex .flex {
+    justify-content: flex-start !important;
+    overflow-x: auto !important;
+    padding-bottom: 2px !important;
+    width: 100% !important;
+    flex-wrap: nowrap !important;
+    scrollbar-width: none;
+  }
+  .app-view-container .filters-flex .flex::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Settings sub-navigation tabs & form grid stacking */
+  .app-view-container .settings-grid {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+  }
+  .app-view-container .settings-grid .lg\:col-span-1 {
+    grid-column: span 1 / span 1 !important;
+  }
+  .app-view-container .settings-grid .lg\:col-span-3 {
+    grid-column: span 1 / span 1 !important;
+  }
+  
+  /* Convert vertical settings sub-nav into horizontal swipable tags */
+  .app-view-container .settings-grid .lg\:col-span-1 > div {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    gap: 8px !important;
+    padding: 6px !important;
+    scrollbar-width: none; /* Hide scrollbars */
+  }
+  .app-view-container .settings-grid .lg\:col-span-1 > div::-webkit-scrollbar {
+    display: none;
+  }
+  .app-view-container .settings-grid .lg\:col-span-1 > div button {
+    width: auto !important;
+    flex-shrink: 0 !important;
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+  }
+}
+
+@container (max-width: 380px) {
+  /* Extremely tight phone frame / narrow screens */
+  .app-view-container .folders-grid {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+  }
+}
+
+/* Custom Scrollbar Hiding Utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+

@@ -140,12 +140,14 @@ export function buildQuestion(
   } else if (subject === 'Fen Bilimleri') {
     q = buildScienceQuestion(unit, topic, index, difficulty, id);
   } else {
-    return buildGenericQuestion(subject, unit, topic, index, difficulty, id);
+    q = buildGenericQuestion(subject, unit, topic, index, difficulty, id);
   }
 
   if (!q.text || q.text === '' || !q.options || q.options.length === 0) {
-    return buildGenericQuestion(subject, unit, topic, index, difficulty, id);
+    q = buildGenericQuestion(subject, unit, topic, index, difficulty, id);
   }
+
+  q.imageUrl = getTopicIllustration(subject, unit, topic, index);
 
   return q;
 }
@@ -802,4 +804,541 @@ function buildScienceQuestion(unit: string, topic: string, index: number, diffic
     unit,
     topic
   };
+}
+
+function getTopicIllustration(subject: string, unit: string, topic: string, index: number): string {
+  let svgContent = '';
+
+  // Specific visuals for different topics
+  if (subject === 'Matematik') {
+    if (topic === 'Asal Çarpanlara Ayırma') {
+      const baseNum = 30 + index * 12;
+      let temp = baseNum;
+      const steps: { val: number; divisor: number }[] = [];
+      for (let d = 2; d <= temp; d++) {
+        while (temp % d === 0) {
+          steps.push({ val: temp, divisor: d });
+          temp /= d;
+        }
+      }
+      steps.push({ val: 1, divisor: 0 });
+
+      let tableRows = '';
+      let y = 30;
+      steps.slice(0, 6).forEach((step) => {
+        tableRows += `
+          <text x="130" y="${y}" font-family="monospace" font-size="13" fill="#1e293b" font-weight="bold" text-anchor="end">${step.val}</text>
+          ${step.divisor ? `<text x="170" y="${y}" font-family="monospace" font-size="13" fill="#4f46e5" font-weight="black">${step.divisor}</text>` : ''}
+        `;
+        y += 24;
+      });
+
+      svgContent = `
+        <!-- Background grid paper style -->
+        <rect width="100%" height="100%" fill="#fafafa"/>
+        <path d="M0,20 H300 M0,40 H300 M0,60 H300 M0,80 H300 M0,100 H300 M0,120 H300 M0,140 H300 M0,160 H300 M0,180 H300" stroke="#f1f5f9" stroke-width="1"/>
+        <path d="M30,0 V200 M60,0 V200 M90,0 V200 M120,0 V200 M150,0 V200 M180,0 V200 M210,0 V200 M240,0 V200 M270,0 V200" stroke="#f1f5f9" stroke-width="1"/>
+        
+        <!-- Factorization ladder -->
+        <line x1="145" y1="12" x2="145" y2="${y - 12}" stroke="#94a3b8" stroke-width="2"/>
+        ${tableRows}
+        
+        <!-- Label Badge -->
+        <rect x="10" y="165" width="280" height="25" rx="6" fill="rgba(79, 70, 229, 0.08)" stroke="rgba(79, 70, 229, 0.15)" stroke-width="1"/>
+        <text x="150" y="181" font-family="sans-serif" font-size="10" font-weight="black" fill="#4f46e5" text-anchor="middle">ASAL ÇARPAN ALGORİTMASI: ${baseNum}</text>
+      `;
+    } 
+    else if (topic === 'EBOB - EKOK Problemleri') {
+      const x = 12 + index * 2;
+      const yVal = 15 + index * 3;
+      const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
+      const ebob = gcd(x, yVal);
+      const ekok = (x * yVal) / ebob;
+
+      svgContent = `
+        <rect width="100%" height="100%" fill="#fefefe"/>
+        <path d="M0,25 H300 M0,50 H300 M0,75 H300 M0,100 H300 M0,125 H300 M0,150 H300 M0,175 H300" stroke="#f8fafc" stroke-width="1"/>
+        
+        <!-- Venn Circles -->
+        <circle cx="120" cy="95" r="50" fill="rgba(79, 70, 229, 0.08)" stroke="#4f46e5" stroke-width="2"/>
+        <circle cx="180" cy="95" r="50" fill="rgba(16, 185, 129, 0.08)" stroke="#10b981" stroke-width="2"/>
+        
+        <!-- Values in circles -->
+        <text x="95" y="99" font-family="sans-serif" font-size="11" font-weight="bold" fill="#4f46e5" text-anchor="middle">A (${x})</text>
+        <text x="205" y="99" font-family="sans-serif" font-size="11" font-weight="bold" fill="#10b981" text-anchor="middle">B (${yVal})</text>
+        
+        <!-- Intersection EBOB -->
+        <text x="150" y="90" font-family="sans-serif" font-size="10" font-weight="extrabold" fill="#1e293b" text-anchor="middle">EBOB</text>
+        <text x="150" y="108" font-family="sans-serif" font-size="14" font-weight="black" fill="#1e293b" text-anchor="middle">${ebob}</text>
+        
+        <!-- Info labels -->
+        <text x="150" y="168" font-family="sans-serif" font-size="10" font-weight="bold" fill="#4f46e5" text-anchor="middle">EKOK(A, B) = ${ekok}</text>
+        <text x="150" y="28" font-family="sans-serif" font-size="11" font-weight="black" fill="#1e293b" text-anchor="middle">EBOB / EKOK Küme Modeli</text>
+      `;
+    }
+    else if (topic === 'Aralarında Asallık') {
+      const a = 10 + index;
+      const b = 21 + index * 2;
+      const gcd = (x: number, y: number): number => y === 0 ? x : gcd(y, x % y);
+      const isCoprime = gcd(a, b) === 1;
+
+      svgContent = `
+        <rect width="100%" height="100%" fill="#fafafa"/>
+        <circle cx="90" cy="95" r="40" fill="rgba(239, 68, 68, 0.05)" stroke="#ef4444" stroke-width="2" stroke-dasharray="3"/>
+        <circle cx="210" cy="95" r="40" fill="rgba(59, 130, 246, 0.05)" stroke="#3b82f6" stroke-width="2" stroke-dasharray="3"/>
+        
+        <text x="90" y="93" font-family="sans-serif" font-size="12" font-weight="black" fill="#ef4444" text-anchor="middle">K = ${a}</text>
+        <text x="210" y="93" font-family="sans-serif" font-size="12" font-weight="black" fill="#3b82f6" text-anchor="middle">L = ${b}</text>
+        
+        <!-- Relational arrow -->
+        <line x1="135" y1="95" x2="165" y2="95" stroke="#64748b" stroke-width="2" stroke-dasharray="3"/>
+        <polygon points="165,92 171,95 165,98" fill="#64748b"/>
+        <polygon points="135,92 129,95 135,98" fill="#64748b"/>
+        
+        <!-- Status Badge -->
+        <rect x="50" y="150" width="200" height="30" rx="8" fill="${isCoprime ? '#dcfce7' : '#fee2e2'}" stroke="${isCoprime ? '#22c55e' : '#ef4444'}" stroke-width="1.5"/>
+        <text x="150" y="169" font-family="sans-serif" font-size="11" font-weight="black" fill="${isCoprime ? '#15803d' : '#991b1b'}" text-anchor="middle">
+          ${isCoprime ? 'ARALARINDA ASAL (EBOB = 1)' : 'ARALARINDA ASAL DEĞİL'}
+        </text>
+        
+        <text x="150" y="32" font-family="sans-serif" font-size="11" font-weight="black" fill="#1e293b" text-anchor="middle">Ortak Bölen Analizi</text>
+      `;
+    }
+    else if (topic.includes('Üslü') || topic.includes('Üssün')) {
+      svgContent = `
+        <rect width="100%" height="100%" fill="#faf5ff"/>
+        <path d="M40,30 V160 M80,30 V160 M120,30 V160 M160,30 V160 M200,30 V160 M240,30 V160 M280,30 V160" stroke="#f3e8ff" stroke-width="1"/>
+        <path d="M40,30 H280 M40,60 H280 M40,90 H280 M40,120 H280 M40,150 H280" stroke="#f3e8ff" stroke-width="1"/>
+        
+        <line x1="40" y1="150" x2="280" y2="150" stroke="#7e22ce" stroke-width="2"/>
+        <line x1="40" y1="30" x2="40" y2="150" stroke="#7e22ce" stroke-width="2"/>
+        
+        <path d="M 40,145 Q 160,140 260,40" fill="none" stroke="#a855f7" stroke-width="3.5" stroke-linecap="round"/>
+        <circle cx="260" cy="40" r="5" fill="#7e22ce"/>
+        
+        <rect x="50" y="40" width="125" height="50" rx="8" fill="rgba(255,255,255,0.95)" stroke="#e9d5ff" stroke-width="1.5"/>
+        <text x="112" y="58" font-family="serif" font-style="italic" font-size="11" font-weight="bold" fill="#7e22ce" text-anchor="middle">f(x) = a^x</text>
+        <text x="112" y="78" font-family="sans-serif" font-size="9" font-weight="black" fill="#581c87" text-anchor="middle">Eksponansiyel Büyüme</text>
+        
+        <text x="150" y="182" font-family="sans-serif" font-size="11" font-weight="black" fill="#7e22ce" text-anchor="middle">Üslü İfadelerin Geometrik Ölçeği</text>
+      `;
+    }
+    else if (topic === 'Bilimsel Gösterim') {
+      const expo = index + 4;
+      svgContent = `
+        <rect width="100%" height="100%" fill="#f0f9ff"/>
+        <circle cx="150" cy="100" r="80" fill="none" stroke="#e0f2fe" stroke-width="1" stroke-dasharray="4"/>
+        
+        <line x1="30" y1="105" x2="270" y2="105" stroke="#0284c7" stroke-width="2" stroke-linecap="round"/>
+        
+        <line x1="50" y1="100" x2="50" y2="110" stroke="#0284c7" stroke-width="2"/>
+        <text x="50" y="125" font-family="monospace" font-size="9" font-weight="bold" fill="#0369a1" text-anchor="middle">10^-6</text>
+        
+        <line x1="100" y1="100" x2="100" y2="110" stroke="#0284c7" stroke-width="2"/>
+        <text x="100" y="125" font-family="monospace" font-size="9" font-weight="bold" fill="#0369a1" text-anchor="middle">10^-3</text>
+        
+        <line x1="150" y1="100" x2="150" y2="110" stroke="#0284c7" stroke-width="2"/>
+        <text x="150" y="125" font-family="monospace" font-size="9" font-weight="bold" fill="#0284c7" text-anchor="middle">10^0</text>
+        
+        <line x1="200" y1="100" x2="200" y2="110" stroke="#0284c7" stroke-width="2"/>
+        <text x="200" y="125" font-family="monospace" font-size="9" font-weight="bold" fill="#0369a1" text-anchor="middle">10^3</text>
+        
+        <line x1="250" y1="100" x2="250" y2="110" stroke="#0284c7" stroke-width="2"/>
+        <text x="250" y="125" font-family="monospace" font-size="9" font-weight="bold" fill="#0369a1" text-anchor="middle">10^${expo}</text>
+        
+        <circle cx="250" cy="105" r="6" fill="#ef4444" stroke="#ffffff" stroke-width="2"/>
+        <path d="M250,105 L250,75" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="2"/>
+        
+        <rect x="205" y="45" width="90" height="25" rx="5" fill="#ef4444"/>
+        <text x="250" y="61" font-family="monospace" font-size="10" font-weight="black" fill="#ffffff" text-anchor="middle">Mikro Ölçek</text>
+        
+        <text x="150" y="170" font-family="sans-serif" font-size="11" font-weight="black" fill="#0284c7" text-anchor="middle">a · 10^n  (1 ≤ |a| &lt; 10)</text>
+        <text x="150" y="32" font-family="sans-serif" font-size="12" font-weight="black" fill="#1e293b" text-anchor="middle">Bilimsel Gösterim Terazisi</text>
+      `;
+    }
+    else if (topic === 'Tam Kare Sayılar') {
+      const rootNum = index + 10;
+      const squareVal = rootNum * rootNum;
+
+      svgContent = `
+        <rect width="100%" height="100%" fill="#f0fdf4"/>
+        <rect x="80" y="45" width="110" height="110" fill="rgba(34, 197, 94, 0.08)" stroke="#22c55e" stroke-width="2.5" stroke-dasharray="3"/>
+        
+        <line x1="116" y1="45" x2="116" y2="155" stroke="rgba(34,197,94,0.15)" stroke-width="1"/>
+        <line x1="153" y1="45" x2="153" y2="155" stroke="rgba(34,197,94,0.15)" stroke-width="1"/>
+        <line x1="80" y1="81" x2="190" y2="81" stroke="rgba(34,197,94,0.15)" stroke-width="1"/>
+        <line x1="80" y1="118" x2="190" y2="118" stroke="rgba(34,197,94,0.15)" stroke-width="1"/>
+        
+        <line x1="80" y1="165" x2="190" y2="165" stroke="#15803d" stroke-width="1.5"/>
+        <path d="M80,161 V169 M190,161 V169" stroke="#15803d" stroke-width="1.5"/>
+        <text x="135" y="180" font-family="sans-serif" font-size="10" font-weight="black" fill="#15803d" text-anchor="middle">Kenar = √${squareVal} = ${rootNum} m</text>
+        
+        <line x1="205" y1="45" x2="205" y2="155" stroke="#15803d" stroke-width="1.5"/>
+        <path d="M201,45 H209 M201,155 H209" stroke="#15803d" stroke-width="1.5"/>
+        <text x="218" y="104" font-family="sans-serif" font-size="10" font-weight="black" fill="#15803d" transform="rotate(90 218 104)" text-anchor="middle">${rootNum} m</text>
+        
+        <text x="135" y="105" font-family="sans-serif" font-size="13" font-weight="black" fill="#15803d" text-anchor="middle">ALAN</text>
+        <text x="135" y="123" font-family="sans-serif" font-size="15" font-weight="black" fill="#166534" text-anchor="middle">${squareVal} m²</text>
+        
+        <text x="150" y="28" font-family="sans-serif" font-size="12" font-weight="black" fill="#1e293b" text-anchor="middle">Geometrik Kare Alan Modeli</text>
+      `;
+    }
+    else if (topic === 'Kök Dışına Çıkarma') {
+      const inside = (index + 1) * (index + 1) * 2;
+      const outsideCoeff = index + 1;
+
+      svgContent = `
+        <rect width="100%" height="100%" fill="#fff7ed"/>
+        <rect x="25" y="45" width="250" height="110" rx="12" fill="#ffffff" stroke="#ffedd5" stroke-width="2"/>
+        
+        <text x="60" y="110" font-family="serif" font-style="italic" font-size="28" fill="#ea580c" font-weight="bold">√${inside}</text>
+        <text x="125" y="106" font-family="serif" font-size="22" fill="#9a3412">=</text>
+        <text x="145" y="108" font-family="serif" font-style="italic" font-size="22" fill="#9a3412">√(${outsideCoeff}² · 2)</text>
+        <text x="215" y="106" font-family="serif" font-size="22" fill="#ea580c">=</text>
+        <text x="235" y="110" font-family="serif" font-style="italic" font-size="28" font-weight="black" fill="#ea580c">${outsideCoeff}√2</text>
+        
+        <text x="60" y="70" font-family="sans-serif" font-size="8" font-weight="bold" fill="#c2410c" text-anchor="middle" letter-spacing="1">RADİKAL SAYI</text>
+        <text x="245" y="70" font-family="sans-serif" font-size="8" font-weight="bold" fill="#c2410c" text-anchor="middle" letter-spacing="1">EN SADE HALİ</text>
+        
+        <text x="150" y="180" font-family="sans-serif" font-size="11" font-weight="black" fill="#ea580c" text-anchor="middle">Karekökten a√b Çıkarma İşlemi</text>
+        <text x="150" y="30" font-family="sans-serif" font-size="12" font-weight="black" fill="#1e293b" text-anchor="middle">Kareköklü Çarpan Ayrışımı</text>
+      `;
+    }
+    else if (topic === 'Kareköklü Sayılarda Çarpma ve Bölme') {
+      const o1 = index + 1;
+      const o2 = index;
+      const answerVal = `${o1 * o2}√6`;
+
+      svgContent = `
+        <rect width="100%" height="100%" fill="#fffbeb"/>
+        <rect x="70" y="45" width="150" height="90" fill="rgba(217, 119, 6, 0.06)" stroke="#d97706" stroke-width="2"/>
+        
+        <text x="145" y="38" font-family="sans-serif" font-size="12" font-weight="black" fill="#b45309" text-anchor="middle">${o1}√3 birim</text>
+        <text x="60" y="94" font-family="sans-serif" font-size="12" font-weight="black" fill="#b45309" transform="rotate(-90 60 94)" text-anchor="middle">${o2}√2 birim</text>
+        
+        <text x="145" y="85" font-family="sans-serif" font-size="11" font-weight="black" fill="#b45309" text-anchor="middle">ALAN HESABI</text>
+        <text x="145" y="105" font-family="serif" font-style="italic" font-size="14" font-weight="black" fill="#78350f" text-anchor="middle">${o1}√3 · ${o2}√2 = ${answerVal}</text>
+        
+        <rect x="20" y="152" width="260" height="28" rx="6" fill="#fef3c7" stroke="#fcd34d" stroke-width="1"/>
+        <text x="150" y="169" font-family="sans-serif" font-size="9" font-weight="black" fill="#78350f" text-anchor="middle">KURAL: (a√x) · (b√y) = (a·b)√(x·y)</text>
+        
+        <text x="150" y="24" font-family="sans-serif" font-size="11" font-weight="black" fill="#1e293b" text-anchor="middle">Geometrik Çarpma Grafiği</text>
+      `;
+    }
+    else if (topic === 'Karekök Tahminleme') {
+      const num = index * 3 + 10;
+      const r = Math.sqrt(num);
+      const low = Math.floor(r);
+      const high = Math.ceil(r);
+      
+      const fraction = (r - low) / (high - low || 1);
+      const dotX = 70 + fraction * 160;
+
+      svgContent = `
+        <rect width="100%" height="100%" fill="#fafaf9"/>
+        <line x1="30" y1="100" x2="270" y2="100" stroke="#78716c" stroke-width="3" stroke-linecap="round"/>
+        
+        <line x1="70" y1="90" x2="70" y2="110" stroke="#78716c" stroke-width="2.5"/>
+        <text x="70" y="130" font-family="sans-serif" font-size="13" font-weight="black" fill="#44403c" text-anchor="middle">${low}</text>
+        <text x="70" y="75" font-family="monospace" font-size="10" font-weight="bold" fill="#a8a29e" text-anchor="middle">√${low*low}</text>
+        
+        <line x1="230" y1="90" x2="230" y2="110" stroke="#78716c" stroke-width="2.5"/>
+        <text x="230" y="130" font-family="sans-serif" font-size="13" font-weight="black" fill="#44403c" text-anchor="middle">${high}</text>
+        <text x="230" y="75" font-family="monospace" font-size="10" font-weight="bold" fill="#a8a29e" text-anchor="middle">√${high*high}</text>
+        
+        <circle cx="${dotX}" cy="100" r="7" fill="#dc2626" stroke="#ffffff" stroke-width="2.5"/>
+        <path d="M${dotX},100 L${dotX},60" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="3"/>
+        
+        <rect x="${dotX - 35}" y="32" width="70" height="24" rx="5" fill="#dc2626"/>
+        <text x="${dotX}" y="47" font-family="sans-serif" font-size="10" font-weight="black" fill="#ffffff" text-anchor="middle">√${num}</text>
+        
+        <text x="150" y="175" font-family="sans-serif" font-size="11" font-weight="black" fill="#dc2626" text-anchor="middle">${low} &lt; √${num} &lt; ${high}</text>
+        <text x="150" y="20" font-family="sans-serif" font-size="12" font-weight="black" fill="#1e293b" text-anchor="middle">Kayıcı Sayı Doğrusu Tahmini</text>
+      `;
+    }
+    else if (topic === 'Sütun Grafiği Dönüşümü') {
+      const item1 = index * 10 + 40;
+      const hMat = Math.min(110, 40 + index * 5);
+      const hTur = 80;
+      const hFen = 60;
+
+      svgContent = `
+        <rect width="100%" height="100%" fill="#eff6ff"/>
+        <line x1="50" y1="30" x2="50" y2="150" stroke="#475569" stroke-width="1.5"/>
+        <line x1="50" y1="150" x2="270" y2="150" stroke="#475569" stroke-width="1.5"/>
+        
+        <rect x="75" y="${150 - hMat}" width="35" height="${hMat}" fill="#3b82f6" rx="4"/>
+        <text x="92.5" y="${142 - hMat}" font-family="sans-serif" font-size="9" font-weight="black" fill="#1d4ed8" text-anchor="middle">${item1}°</text>
+        <text x="92.5" y="165" font-family="sans-serif" font-size="10" font-weight="bold" fill="#1e293b" text-anchor="middle">Mat</text>
+        
+        <rect x="140" y="${150 - hTur}" width="35" height="${hTur}" fill="#ec4899" rx="4"/>
+        <text x="157.5" y="${142 - hTur}" font-family="sans-serif" font-size="9" font-weight="black" fill="#be185d" text-anchor="middle">80°</text>
+        <text x="157.5" y="165" font-family="sans-serif" font-size="10" font-weight="bold" fill="#1e293b" text-anchor="middle">Tür</text>
+        
+        <rect x="205" y="${150 - hFen}" width="35" height="${hFen}" fill="#10b981" rx="4"/>
+        <text x="222.5" y="${142 - hFen}" font-family="sans-serif" font-size="9" font-weight="black" fill="#047857" text-anchor="middle">60°</text>
+        <text x="222.5" y="165" font-family="sans-serif" font-size="10" font-weight="bold" fill="#1e293b" text-anchor="middle">Fen</text>
+        
+        <text x="150" y="24" font-family="sans-serif" font-size="12" font-weight="black" fill="#1e293b" text-anchor="middle">Sütun Dağılım Analizi</text>
+      `;
+    }
+    else if (topic === 'Daire Grafiği Analizi') {
+      const angle = index * 5 + 60 > 350 ? 350 : index * 5 + 60;
+      
+      const rad = (angle - 90) * Math.PI / 180;
+      const targetX = 150 + 55 * Math.cos(rad);
+      const targetY = 100 + 55 * Math.sin(rad);
+      const largeArc = angle > 180 ? 1 : 0;
+
+      svgContent = `
+        <rect width="100%" height="100%" fill="#fbf7f5"/>
+        <circle cx="150" cy="100" r="55" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+        
+        <path d="M 150,100 L 150,45 A 55,55 0 ${largeArc},1 ${targetX},${targetY} Z" fill="#f97316" stroke="#ea580c" stroke-width="1"/>
+        
+        <rect x="70" y="162" width="160" height="24" rx="6" fill="#ffedd5" stroke="#fed7aa" stroke-width="1"/>
+        <text x="150" y="178" font-family="sans-serif" font-size="10" font-weight="black" fill="#ea580c" text-anchor="middle">Açı = ${angle}°</text>
+        
+        <text x="150" y="28" font-family="sans-serif" font-size="12" font-weight="black" fill="#1e293b" text-anchor="middle">Merkez Açı Orantısı</text>
+      `;
+    }
+    else if (topic === 'Özdeşlikler' || topic.includes('Çarpanlara')) {
+      svgContent = `
+        <rect width="100%" height="100%" fill="#f8fafc"/>
+        <rect x="80" y="45" width="120" height="120" fill="rgba(71, 85, 105, 0.04)" stroke="#475569" stroke-width="2.5"/>
+        
+        <line x1="165" y1="45" x2="165" y2="165" stroke="#64748b" stroke-width="1.5" stroke-dasharray="3"/>
+        <line x1="80" y1="130" x2="200" y2="130" stroke="#64748b" stroke-width="1.5" stroke-dasharray="3"/>
+        
+        <text x="122.5" y="92.5" font-family="sans-serif" font-size="15" font-weight="black" fill="#1e293b" text-anchor="middle">x²</text>
+        <text x="182.5" y="92.5" font-family="sans-serif" font-size="12" font-weight="bold" fill="#64748b" text-anchor="middle">ax</text>
+        <text x="122.5" y="152.5" font-family="sans-serif" font-size="12" font-weight="bold" fill="#64748b" text-anchor="middle">ax</text>
+        <text x="182.5" y="152.5" font-family="sans-serif" font-size="14" font-weight="black" fill="#1e293b" text-anchor="middle">a²</text>
+        
+        <text x="122.5" y="38" font-family="sans-serif" font-size="10" font-weight="bold" fill="#475569" text-anchor="middle">x</text>
+        <text x="182.5" y="38" font-family="sans-serif" font-size="10" font-weight="bold" fill="#475569" text-anchor="middle">a</text>
+        
+        <text x="212" y="87.5" font-family="sans-serif" font-size="10" font-weight="bold" fill="#475569" text-anchor="start">x</text>
+        <text x="212" y="147.5" font-family="sans-serif" font-size="10" font-weight="bold" fill="#475569" text-anchor="start">a</text>
+        
+        <text x="150" y="24" font-family="sans-serif" font-size="11" font-weight="black" fill="#1e293b" text-anchor="middle">Özdeşlik Alan Çarpan Dağılımı</text>
+      `;
+    }
+  } 
+  else if (subject === 'Fen Bilimleri') {
+    if (topic === 'Mevsimlerin Oluşumu') {
+      svgContent = `
+        <rect width="100%" height="100%" fill="#090d16"/>
+        <circle cx="40" cy="50" r="1" fill="#ffffff" opacity="0.4"/>
+        <circle cx="270" cy="60" r="1.5" fill="#ffffff" opacity="0.6"/>
+        <circle cx="110" cy="170" r="1" fill="#ffffff" opacity="0.3"/>
+        <circle cx="220" cy="40" r="1.2" fill="#ffffff" opacity="0.5"/>
+        
+        <circle cx="150" cy="100" r="22" fill="#f59e0b" opacity="0.2"/>
+        <circle cx="150" cy="100" r="16" fill="#f97316"/>
+        
+        <ellipse cx="150" cy="100" rx="110" ry="40" fill="none" stroke="#334155" stroke-width="1.5" stroke-dasharray="4"/>
+        
+        <g transform="translate(40, 100)">
+          <circle cx="0" cy="0" r="10" fill="#3b82f6"/>
+          <line x1="-5" y1="-14" x2="5" y2="14" stroke="#ef4444" stroke-width="1.5"/>
+          <line x1="-10" y1="0" x2="10" y2="0" stroke="#ffffff" stroke-width="1" transform="rotate(-23.5)"/>
+        </g>
+        
+        <g transform="translate(260, 100)">
+          <circle cx="0" cy="0" r="10" fill="#3b82f6"/>
+          <line x1="-5" y1="-14" x2="5" y2="14" stroke="#ef4444" stroke-width="1.5"/>
+          <line x1="-10" y1="0" x2="10" y2="0" stroke="#ffffff" stroke-width="1" transform="rotate(-23.5)"/>
+        </g>
+        
+        <text x="40" y="128" font-family="sans-serif" font-size="9" font-weight="black" fill="#38bdf8" text-anchor="middle">Yaz Gündönümü</text>
+        <text x="260" y="128" font-family="sans-serif" font-size="9" font-weight="black" fill="#38bdf8" text-anchor="middle">Kış Gündönümü</text>
+        
+        <path d="M 150,55 L 158,60" stroke="#475569" stroke-width="1.5" stroke-linecap="round"/>
+        
+        <text x="150" y="176" font-family="sans-serif" font-size="11" font-weight="black" fill="#94a3b8" text-anchor="middle">Güneş Etrafında Eliptik Dolanım</text>
+        <text x="150" y="24" font-family="sans-serif" font-size="12" font-weight="black" fill="#f8fafc" text-anchor="middle">Mevsimlerin Kozmik Oluşumu</text>
+      `;
+    }
+    else if (topic.includes('İklim') || topic.includes('Rüzgar')) {
+      svgContent = `
+        <rect width="100%" height="100%" fill="#f0fdff"/>
+        <rect x="0" y="145" width="300" height="55" fill="#e2e8f0"/>
+        <line x1="0" y1="145" x2="300" y2="145" stroke="#94a3b8" stroke-width="2"/>
+        
+        <path d="M 70,135 Q 70,80 110,65" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="3"/>
+        <polygon points="105,62 113,65 107,71" fill="#ef4444"/>
+        
+        <path d="M 190,65 Q 230,80 230,135" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-dasharray="3"/>
+        <polygon points="226,128 230,136 234,128" fill="#3b82f6"/>
+        
+        <path d="M 220,135 H 80" fill="none" stroke="#06b6d4" stroke-width="4" stroke-linecap="round"/>
+        <polygon points="90,130 76,135 90,140" fill="#06b6d4"/>
+        
+        <text x="60" y="125" font-family="sans-serif" font-size="10" font-weight="black" fill="#b91c1c" text-anchor="middle">SICAK</text>
+        <text x="60" y="110" font-family="sans-serif" font-size="9" font-weight="bold" fill="#dc2626" text-anchor="middle">Alçak Basınç</text>
+        
+        <text x="240" y="125" font-family="sans-serif" font-size="10" font-weight="black" fill="#1d4ed8" text-anchor="middle">SOĞUK</text>
+        <text x="240" y="110" font-family="sans-serif" font-size="9" font-weight="bold" fill="#2563eb" text-anchor="middle">Yüksek Basınç</text>
+        
+        <text x="150" y="120" font-family="sans-serif" font-size="11" font-weight="black" fill="#0891b2" text-anchor="middle">RÜZGAR</text>
+        
+        <text x="150" y="180" font-family="sans-serif" font-size="11" font-weight="black" fill="#0e7490" text-anchor="middle">Hava Basınç Hücre Döngüsü</text>
+        <text x="150" y="28" font-family="sans-serif" font-size="12" font-weight="black" fill="#1e293b" text-anchor="middle">Hava Hareketleri ve Rüzgar Oluşumu</text>
+      `;
+    }
+    else if (topic.includes('DNA')) {
+      let baseLines = '';
+      for (let i = 0; i < 9; i++) {
+        const cx = 55 + i * 24;
+        const y1 = 100 + 35 * Math.sin(i * 0.9);
+        const y2 = 100 - 35 * Math.sin(i * 0.9);
+        const rColors = i % 2 === 0 ? ['#ef4444', '#3b82f6'] : ['#10b981', '#f59e0b'];
+        
+        baseLines += `
+          <line x1="${cx}" y1="${y1}" x2="${cx}" y2="100" stroke="${rColors[0]}" stroke-width="2.5"/>
+          <line x1="${cx}" y1="100" x2="${cx}" y2="${y2}" stroke="${rColors[1]}" stroke-width="2.5"/>
+          <circle cx="${cx}" cy="${y1}" r="3" fill="#1e293b"/>
+          <circle cx="${cx}" cy="${y2}" r="3" fill="#1e293b"/>
+        `;
+      }
+
+      svgContent = `
+        <rect width="100%" height="100%" fill="#f8fafc"/>
+        <path d="M 40,100 Q 67,143 91,100 T 139,100 T 187,100 T 235,100 T 270,100" fill="none" stroke="#3b82f6" stroke-width="3" opacity="0.25"/>
+        
+        ${baseLines}
+        
+        <rect x="20" y="152" width="260" height="28" rx="6" fill="#e0f2fe" stroke="#bae6fd" stroke-width="1"/>
+        <text x="150" y="169" font-family="sans-serif" font-size="9" font-weight="black" fill="#0369a1" text-anchor="middle">NÜKLEOTİD: Adenin(A) - Timin(T), Guanin(G) - Sitozin(C)</text>
+        
+        <text x="150" y="24" font-family="sans-serif" font-size="12" font-weight="black" fill="#1e293b" text-anchor="middle">DNA Çift Sarmal Modeli</text>
+      `;
+    }
+    else if (topic.includes('Kalıtım') || topic.includes('Çaprazlama')) {
+      svgContent = `
+        <rect width="100%" height="100%" fill="#fdfdec"/>
+        <rect x="90" y="45" width="130" height="110" fill="#ffffff" stroke="#71717a" stroke-width="2"/>
+        
+        <line x1="155" y1="45" x2="155" y2="155" stroke="#71717a" stroke-width="1.5"/>
+        <line x1="90" y1="100" x2="220" y2="100" stroke="#71717a" stroke-width="1.5"/>
+        
+        <text x="75" y="78" font-family="sans-serif" font-size="14" font-weight="black" fill="#dc2626" text-anchor="middle">S</text>
+        <text x="75" y="132" font-family="sans-serif" font-size="14" font-weight="black" fill="#2563eb" text-anchor="middle">s</text>
+        
+        <text x="122.5" y="35" font-family="sans-serif" font-size="14" font-weight="black" fill="#dc2626" text-anchor="middle">S</text>
+        <text x="187.5" y="35" font-family="sans-serif" font-size="14" font-weight="black" fill="#2563eb" text-anchor="middle">s</text>
+        
+        <text x="122.5" y="78" font-family="sans-serif" font-size="13" font-weight="black" fill="#dc2626" text-anchor="middle">SS</text>
+        <text x="187.5" y="78" font-family="sans-serif" font-size="13" font-weight="black" fill="#ea580c" text-anchor="middle">Ss</text>
+        <text x="122.5" y="132" font-family="sans-serif" font-size="13" font-weight="black" fill="#ea580c" text-anchor="middle">Ss</text>
+        <text x="187.5" y="132" font-family="sans-serif" font-size="13" font-weight="black" fill="#2563eb" text-anchor="middle">ss</text>
+        
+        <rect x="60" y="165" width="180" height="22" rx="5" fill="#fef08a" stroke="#facc15" stroke-width="1"/>
+        <text x="150" y="179" font-family="sans-serif" font-size="9" font-weight="black" fill="#854d0e" text-anchor="middle">Yeşil Tohum (ss) Olasılığı: %25</text>
+        
+        <text x="150" y="20" font-family="sans-serif" font-size="11" font-weight="black" fill="#1e293b" text-anchor="middle">Punnett Karesi Çaprazlaması</text>
+      `;
+    }
+    else if (topic === 'Katı Basıncı') {
+      svgContent = `
+        <rect width="100%" height="100%" fill="#fef6f2"/>
+        <rect x="0" y="135" width="300" height="65" fill="#fed7aa"/>
+        <line x1="0" y1="135" x2="300" y2="135" stroke="#f97316" stroke-width="1.5"/>
+        
+        <rect x="60" y="55" width="40" height="85" fill="#94a3b8" stroke="#475569" stroke-width="2"/>
+        <text x="80" y="95" font-family="sans-serif" font-size="12" font-weight="black" fill="#1e293b" text-anchor="middle">2G</text>
+        <text x="80" y="125" font-family="sans-serif" font-size="10" font-weight="bold" fill="#0f172a" text-anchor="middle">S</text>
+        <path d="M 55,135 L 60,140 L 100,140 L 105,135 Z" fill="#ea580c"/>
+        <text x="80" y="152" font-family="sans-serif" font-size="9" font-weight="bold" fill="#7c2d12" text-anchor="middle">Yüksek P</text>
+        
+        <rect x="170" y="85" width="80" height="52" fill="#94a3b8" stroke="#475569" stroke-width="2"/>
+        <text x="210" y="110" font-family="sans-serif" font-size="12" font-weight="black" fill="#1e293b" text-anchor="middle">G</text>
+        <text x="210" y="127" font-family="sans-serif" font-size="10" font-weight="bold" fill="#0f172a" text-anchor="middle">2S</text>
+        <path d="M 167,135 L 170,137 L 250,137 L 253,135 Z" fill="#f97316"/>
+        <text x="210" y="152" font-family="sans-serif" font-size="9" font-weight="bold" fill="#7c2d12" text-anchor="middle">Düşük P</text>
+        
+        <text x="150" y="180" font-family="sans-serif" font-size="11" font-weight="black" fill="#ea580c" text-anchor="middle">P = G / S  (Basınç = Kuvvet / Yüzey)</text>
+        <text x="150" y="24" font-family="sans-serif" font-size="12" font-weight="black" fill="#1e293b" text-anchor="middle">Katı Cisim Basınç Dağılımı</text>
+      `;
+    }
+    else if (topic === 'Sıvı Basıncı') {
+      svgContent = `
+        <rect width="100%" height="100%" fill="#f0f9ff"/>
+        <rect x="70" y="35" width="80" height="120" fill="rgba(14, 165, 233, 0.12)" stroke="#0284c7" stroke-width="2.5"/>
+        <rect x="71.5" y="55" width="77" height="99" fill="rgba(14, 165, 233, 0.25)"/>
+        
+        <line x1="70" y1="55" x2="150" y2="55" stroke="#38bdf8" stroke-width="2.5"/>
+        
+        <line x1="120" y1="55" x2="120" y2="85" stroke="#0369a1" stroke-width="1" stroke-dasharray="2"/>
+        <text x="114" y="75" font-family="sans-serif" font-size="9" font-weight="black" fill="#0369a1" text-anchor="end">h₁</text>
+        
+        <line x1="135" y1="55" x2="135" y2="125" stroke="#0369a1" stroke-width="1" stroke-dasharray="2"/>
+        <text x="129" y="95" font-family="sans-serif" font-size="9" font-weight="black" fill="#0369a1" text-anchor="end">h₂</text>
+        
+        <path d="M 150,85 Q 170,85 180,155" fill="none" stroke="#0284c7" stroke-width="2"/>
+        <circle cx="150" cy="85" r="2.5" fill="#0284c7"/>
+        
+        <path d="M 150,125 Q 210,125 240,155" fill="none" stroke="#0284c7" stroke-width="2.5"/>
+        <circle cx="150" cy="125" r="2.5" fill="#0284c7"/>
+        
+        <line x1="40" y1="155" x2="260" y2="155" stroke="#64748b" stroke-width="1.5"/>
+        
+        <text x="150" y="180" font-family="sans-serif" font-size="11" font-weight="black" fill="#0284c7" text-anchor="middle">P_sıvı = h · d · g</text>
+        <text x="150" y="24" font-family="sans-serif" font-size="12" font-weight="black" fill="#1e293b" text-anchor="middle">Sıvı Basıncı Derinlik Deneyi</text>
+      `;
+    }
+    else if (topic === 'Gaz Basıncı') {
+      svgContent = `
+        <rect width="100%" height="100%" fill="#fafaf9"/>
+        <path d="M 90,135 H 210 V 155 H 90 Z" fill="#cbd5e1" stroke="#64748b" stroke-width="2"/>
+        <rect x="91" y="136" width="118" height="15" fill="#94a3b8"/>
+        
+        <rect x="135" y="35" width="30" height="110" fill="none" stroke="#64748b" stroke-width="2"/>
+        <rect x="136.5" y="60" width="27" height="85" fill="#475569"/>
+        
+        <line x1="172" y1="60" x2="190" y2="60" stroke="#ef4444" stroke-width="1.5"/>
+        <line x1="172" y1="135" x2="190" y2="135" stroke="#ef4444" stroke-width="1.5"/>
+        <line x1="185" y1="60" x2="185" y2="135" stroke="#ef4444" stroke-width="1.5"/>
+        <text x="195" y="103" font-family="sans-serif" font-size="10" font-weight="black" fill="#dc2626" text-anchor="start">76 cmHg</text>
+        
+        <path d="M 110,95 V 125" fill="none" stroke="#2563eb" stroke-width="2"/>
+        <polygon points="106,120 110,126 114,120" fill="#2563eb"/>
+        
+        <path d="M 190,95 V 125" fill="none" stroke="#2563eb" stroke-width="2"/>
+        <polygon points="186,120 190,126 194,120" fill="#2563eb"/>
+        
+        <text x="110" y="85" font-family="sans-serif" font-size="9" font-weight="black" fill="#1d4ed8" text-anchor="middle">P_açık</text>
+        <text x="190" y="85" font-family="sans-serif" font-size="9" font-weight="black" fill="#1d4ed8" text-anchor="middle">P_açık</text>
+        
+        <text x="150" y="178" font-family="sans-serif" font-size="11" font-weight="black" fill="#475569" text-anchor="middle">Torricelli Açık Hava Basınç Barometresi</text>
+        <text x="150" y="24" font-family="sans-serif" font-size="12" font-weight="black" fill="#1e293b" text-anchor="middle">Açık Hava ve Gaz Basıncı</text>
+      `;
+    }
+  }
+
+  // Generic fallback vector illustration for other subjects (like Türkçe)
+  if (!svgContent) {
+    svgContent = `
+      <rect width="100%" height="100%" fill="#f8fafc"/>
+      <path d="M 0,0 H 300 V 200 H 0 Z" fill="rgba(99, 102, 241, 0.02)"/>
+      
+      <circle cx="150" cy="95" r="45" fill="none" stroke="rgba(99, 102, 241, 0.12)" stroke-width="2.5" stroke-dasharray="4"/>
+      <circle cx="150" cy="95" r="30" fill="none" stroke="rgba(99, 102, 241, 0.25)" stroke-width="1.5"/>
+      <circle cx="150" cy="95" r="10" fill="#4338ca"/>
+      
+      <path d="M 150,40 V 70" stroke="#4f46e5" stroke-width="2"/>
+      <polygon points="146,65 150,72 154,65" fill="#4f46e5"/>
+      
+      <rect x="105" y="150" width="90" height="25" rx="6" fill="#e0e7ff" stroke="#c7d2fe" stroke-width="1"/>
+      <text x="150" y="166" font-family="sans-serif" font-size="10" font-weight="black" fill="#4338ca" text-anchor="middle">KAZANIM ANALİZİ</text>
+      
+      <text x="150" y="132" font-family="sans-serif" font-size="11" font-weight="black" fill="#1e293b" text-anchor="middle">${topic}</text>
+      <text x="150" y="32" font-family="sans-serif" font-size="12" font-weight="black" fill="#4338ca" text-anchor="middle">LGS ${subject} Kılavuzu</text>
+    `;
+  }
+
+  // Assemble full SVG document and return as data URI
+  const fullSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200" width="100%" height="100%">${svgContent}</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(fullSvg)}`;
 }

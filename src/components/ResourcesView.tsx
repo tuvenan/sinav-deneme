@@ -687,7 +687,7 @@ export default function ResourcesView({ uploadTrigger = 0, isAdminMode = false }
   const selectedFolderInfo = folders.find(f => f.name === selectedFolder);
 
   return (
-    <div id="resources_view_container" className="p-6 lg:p-10 max-w-6xl mx-auto space-y-8 animate-slide-up">
+    <div id="resources_view_container" className="p-2 xs:p-4 sm:p-8 max-w-6xl mx-auto space-y-4 sm:space-y-8 animate-slide-up">
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-outline pb-6">
         <div className="space-y-1">
@@ -709,7 +709,7 @@ export default function ResourcesView({ uploadTrigger = 0, isAdminMode = false }
       </div>
 
       {/* Quick Search & Format Tag Filters */}
-      <div className="bg-white border border-outline rounded-xl p-4 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+      <div className="filters-flex bg-white border border-outline rounded-xl p-4 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/70" size={16} />
           <input
@@ -783,7 +783,7 @@ export default function ResourcesView({ uploadTrigger = 0, isAdminMode = false }
           )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="folders-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {folders.map((folder) => {
             const isSelected = selectedFolder === folder.name;
             return (

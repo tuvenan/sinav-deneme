@@ -11,6 +11,8 @@ import AnalysisView from './components/AnalysisView';
 import ResourcesView from './components/ResourcesView';
 import SettingsView from './components/SettingsView';
 import AdminView from './components/AdminView';
+import MobileAppShell from './components/MobileAppShell';
+import AIGuideView from './components/AIGuideView';
 import type { Question, Message, Difficulty, SolveHistory } from './types';
 import { useFirebase } from './components/FirebaseContext';
 import { getOrCreateUserProfile, getSolveHistories, addSolveHistory } from './lib/db';
@@ -284,6 +286,8 @@ export default function App() {
   const [difficulty, setDifficulty] = useState<Difficulty>('Hepsi');
   const [correctStreak, setCorrectStreak] = useState(0);
   const [progress, setProgress] = useState(60);
+  const [isFocusMode, setIsFocusMode] = useState(true);
+  const [isSolving, setIsSolving] = useState(false);
 
   // Lesson, Unit, Topic Cascade Filters
   const [selectedSubject, setSelectedSubject] = useState<string>('Hepsi');
@@ -607,44 +611,21 @@ export default function App() {
     };
   }, [questions]);
 
-  return (
-    <div className="min-h-screen bg-surface flex flex-col">
-      <Header 
-        onToggleSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
-      />
-      <div className="flex pt-16 flex-1">
-        <Sidebar 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab} 
-          onUploadClick={handleUploadClick} 
-          isMobileOpen={isMobileSidebarOpen}
-          onClose={() => setIsMobileSidebarOpen(false)}
+  if (activeTab === 'admin') {
+    return (
+      <div className="min-h-screen bg-surface flex flex-col">
+        <Header 
+          onToggleSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
         />
-        <main className="flex-1 md:ml-64 mr-0 bg-background z-10 flex flex-col">
-          {activeTab === 'calisma' && currentQuestion && (
-            <QuestionArea
-              question={currentQuestion}
-              questions={questions}
-              syllabus={syllabus}
-              onNewQuestion={loadNewQuestion}
-              onAnswer={handleAnswer}
-              selectedDifficulty={difficulty}
-              setDifficulty={setDifficulty}
-              correctStreak={correctStreak}
-              selectedSubject={selectedSubject}
-              setSelectedSubject={setSelectedSubject}
-              selectedUnit={selectedUnit}
-              setSelectedUnit={setSelectedUnit}
-              selectedTopic={selectedTopic}
-              setSelectedTopic={setSelectedTopic}
-              solveHistory={solveHistory}
-              onSelectQuestion={setCurrentQuestion}
-            />
-          )}
-          {activeTab === 'analiz' && <AnalysisView solveHistory={solveHistory} />}
-          {activeTab === 'kaynaklar' && <ResourcesView uploadTrigger={resourceUploadTrigger} />}
-          {activeTab === 'ayarlar' && <SettingsView solveHistory={solveHistory} />}
-          {activeTab === 'admin' && (
+        <div className="flex pt-16 flex-1">
+          <Sidebar 
+            activeTab={activeTab} 
+            setActiveTab={setActiveTab} 
+            onUploadClick={handleUploadClick} 
+            isMobileOpen={isMobileSidebarOpen}
+            onClose={() => setIsMobileSidebarOpen(false)}
+          />
+          <main className="flex-1 md:ml-64 mr-0 bg-background z-10 flex flex-col">
             <AdminView
               questions={questions}
               setQuestions={setQuestions}
@@ -659,9 +640,61 @@ export default function App() {
               currentQuestion={currentQuestion}
               setCurrentQuestion={setCurrentQuestion}
             />
-          )}
-        </main>
+          </main>
+        </div>
       </div>
+    );
+  }
+
+  const isFocusActive = isFocusMode && activeTab === 'calisma' && isSolving;
+
+  return (
+    <div className="min-h-screen bg-surface flex flex-col">
+      <MobileAppShell
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        correctStreak={correctStreak}
+        isFocusActive={isFocusActive}
+      >
+        {activeTab === 'calisma' && currentQuestion && (
+          <QuestionArea
+            question={currentQuestion}
+            questions={questions}
+            syllabus={syllabus}
+            onNewQuestion={loadNewQuestion}
+            onAnswer={handleAnswer}
+            selectedDifficulty={difficulty}
+            setDifficulty={setDifficulty}
+            correctStreak={correctStreak}
+            selectedSubject={selectedSubject}
+            setSelectedSubject={setSelectedSubject}
+            selectedUnit={selectedUnit}
+            setSelectedUnit={setSelectedUnit}
+            selectedTopic={selectedTopic}
+            setSelectedTopic={setSelectedTopic}
+            solveHistory={solveHistory}
+            onSelectQuestion={setCurrentQuestion}
+            isFocusMode={isFocusMode}
+            setIsFocusMode={setIsFocusMode}
+            onFocusStateChange={setIsSolving}
+          />
+        )}
+        {activeTab === 'analiz' && (
+          <AnalysisView 
+            solveHistory={solveHistory} 
+            questions={questions}
+            syllabus={syllabus}
+          />
+        )}
+        {activeTab === 'mentor' && (
+          <AIGuideView 
+            solveHistory={solveHistory} 
+            questions={questions}
+          />
+        )}
+        {activeTab === 'kaynaklar' && <ResourcesView uploadTrigger={resourceUploadTrigger} />}
+        {activeTab === 'ayarlar' && <SettingsView solveHistory={solveHistory} />}
+      </MobileAppShell>
 
       {/* Modern, High-Conversion Google Sign-Up & Onboarding Modal */}
       {!user && showRegisterPromo && (

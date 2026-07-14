@@ -1,4 +1,4 @@
-import { BookOpen, FolderOpen, LayoutDashboard, Settings, TrendingUp, Upload, Zap, Shield } from 'lucide-react';
+import { BookOpen, FolderOpen, LayoutDashboard, Settings, TrendingUp, Upload, Zap, Shield, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface SidebarProps {
@@ -13,6 +13,7 @@ export default function Sidebar({ activeTab, setActiveTab, onUploadClick, isMobi
   const navItems = [
     { id: 'calisma', label: 'Çalışma Alanı', icon: BookOpen },
     { id: 'analiz', label: 'Konu Analizi', icon: TrendingUp },
+    { id: 'mentor', label: 'Yapay Zeka Mentor', icon: Sparkles },
     { id: 'kaynaklar', label: 'Kaynaklarım', icon: FolderOpen },
   ];
 

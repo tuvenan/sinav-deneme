@@ -134,10 +134,87 @@ const FORMULA_QUIZZES = [
   }
 ];
 
+import type { Question, SolveHistory } from '../types';
+
 type SubTab = 'main' | 'soru-cozum' | 'stratejik-ipucu' | 'hata-analiz' | 'rehberlik' | 'sohbet';
 
-export default function AIGuideView() {
+interface AIGuideViewProps {
+  solveHistory?: SolveHistory[];
+  questions?: Question[];
+}
+
+export default function AIGuideView({ solveHistory = [], questions = [] }: AIGuideViewProps) {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('main');
+  const [selectedWrongQId, setSelectedWrongQId] = useState<string | null>(null);
+
+  const localHistory = useMemo(() => {
+    if (solveHistory && solveHistory.length > 0) return solveHistory;
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('lgs_solve_history');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+    return [];
+  }, [solveHistory]);
+
+  const localQuestions = useMemo(() => {
+    if (questions && questions.length > 0) return questions;
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('lgs_questions_pool');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+    return [];
+  }, [questions]);
+
+  // Find all unique wrong questions and model personalized step-by-step paths
+  const wrongQuestionsList = useMemo(() => {
+    const wrongHistory = localHistory.filter((h: any) => !h.isCorrect);
+    const uniqueQuestionIds = Array.from(new Set(wrongHistory.map((h: any) => h.questionId)));
+    
+    return uniqueQuestionIds.map(qId => {
+      const question = localQuestions.find((q: any) => q.id === qId);
+      if (!question) return null;
+      
+      const steps = [
+        {
+          title: 'Adım 1: Hatayı Teşhis Etme ve Analiz',
+          desc: `Yapay Zeka Mentor Analizi: Bu sorudaki yanlış cevap, "${question.errorType || 'Kavram Çözümlemesi'}" kategorisindedir. ${question.errorAnalysis || 'Bu kazanımda kavram süzgeçlerinde eşleşme veya işlem adımları takibi sırasında dikkat dağınıklığı yaşanmış olabilir.'}`,
+          tip: 'Çözüm Yolu: Çözüme başlamadan önce sorunun senden ne istediğini netleştir.'
+        },
+        {
+          title: 'Adım 2: Konunun Temel Kuralları',
+          desc: `"${question.topic}" kazanımı kapsamında bilmen gereken ana kural şudur: ${question.context || 'Verilen öncülleri ve mantıksal yapıları dikkatlice takip et.'}`,
+          tip: 'Unutma: LGS yeni nesil soruları sadece ezber değil, bu kuralları yorumlama becerisini ölçer.'
+        },
+        {
+          title: 'Adım 3: Soru Çözümünün İpucu ve Yol Haritası',
+          desc: `Mentor İpucu: ${question.hint || 'Öncelikle konunun temel tanımlarına odaklanın ve soruda verilen öncülleri eleme yöntemiyle sırasıyla eşleştirin.'}`,
+          tip: 'Strateji: İşlem adımlarını kağıda tek tek yazarak yap. Zihinden işlem yapmak hata oranını artırır.'
+        },
+        {
+          title: 'Adım 4: LGS Şampiyon Taktikleri (Çeldiricilerden Kaçış)',
+          desc: `Bu soru türünde LGS hazırlık komisyonlarının en çok kullandığı çeldirici, işlem adımlarındaki dikkatsizlik veya birim dönüşümlerini (örneğin mm'den cm'ye geçiş, kesim sayısı ile parça sayısı farkı gibi) gözden kaçırmaktır.`,
+          tip: 'Şampiyon Tavsiyesi: Sonucu bulduğunda, bulduğun değerin soru kökünde istenen birimle uyuşup uyuşmadığını mutlaka kontrol et!'
+        }
+      ];
+
+      return {
+        ...question,
+        steps
+      };
+    }).filter(Boolean) as Array<Question & { steps: Array<{ title: string; desc: string; tip: string }> }>;
+  }, [localHistory, localQuestions]);
 
   const { accessToken, connectCalendar } = useFirebase();
   const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
@@ -975,6 +1052,139 @@ export default function AIGuideView() {
             exit={{ opacity: 0, y: -15 }}
             className="grid grid-cols-1 md:grid-cols-12 gap-6"
           >
+            {/* PERSONALIZED AI MENTORSHIP STEPS COMPONENT */}
+            <div className="col-span-1 md:col-span-12 space-y-6">
+              <div className="bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 border border-indigo-100 rounded-3xl p-6 sm:p-8 space-y-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md">
+                    <Sparkles size={20} className="animate-pulse" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-mono tracking-widest font-black text-indigo-600 block uppercase">Bireysel Öğrenme Asistanı</span>
+                    <h3 className="text-xl sm:text-2xl font-serif font-black text-neutral-800">Yapay Zeka Mentorluk İpuçları</h3>
+                  </div>
+                </div>
+                <p className="text-xs sm:text-sm text-neutral-600 max-w-3xl leading-relaxed">
+                  Çalışma alanında çözüp yanlış yaptığın her soru türü için yapay zeka tarafından özel olarak tasarlanmış, adım adım gelişim ve çözüm haritaların burada birikir. Hatandan ders çıkarmak başarının sırrıdır!
+                </p>
+
+                {wrongQuestionsList.length === 0 ? (
+                  <div className="bg-white/80 backdrop-blur-xs border border-neutral-100 rounded-2xl p-6 text-center space-y-4 shadow-xs">
+                    <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">
+                      🎉
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-serif font-bold text-neutral-800 text-base">Mükemmel İlerleme, Sıfır Hata!</h4>
+                      <p className="text-xs text-neutral-500 max-w-md mx-auto">
+                        Henüz yanlış cevapladığın bir soru bulunmuyor. Bir testi çözerken yanlış yaptığında, o soru türüne özel adım adım çözüm yolu ve mentor ipuçları otomatik olarak burada hazırlanacak.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">
+                      Senin İçin Hazırlanan Çözüm Haritaları ({wrongQuestionsList.length} Adet):
+                    </div>
+                    <div className="grid grid-cols-1 gap-3">
+                      {wrongQuestionsList.map((q) => {
+                        const isOpen = selectedWrongQId === q.id;
+                        return (
+                          <div 
+                            key={q.id}
+                            className={`bg-white border transition-all rounded-2xl overflow-hidden ${
+                              isOpen ? 'border-indigo-400 shadow-md ring-1 ring-indigo-400/20' : 'border-neutral-200 hover:border-neutral-300 shadow-xs'
+                            }`}
+                          >
+                            {/* Accordion Header */}
+                            <button
+                              onClick={() => setSelectedWrongQId(isOpen ? null : q.id)}
+                              className="w-full text-left p-4 sm:p-5 flex items-center justify-between gap-4 cursor-pointer focus:outline-none"
+                            >
+                              <div className="space-y-1.5 flex-1 min-w-0">
+                                <div className="flex flex-wrap gap-2 items-center">
+                                  <span className="text-[10px] font-bold px-2.5 py-0.5 bg-neutral-100 text-neutral-600 rounded-md font-mono">
+                                    {q.id}
+                                  </span>
+                                  <span className="text-[10px] font-bold px-2.5 py-0.5 bg-rose-50 text-rose-600 rounded-md">
+                                    {q.subject} • {q.topic}
+                                  </span>
+                                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-md ${
+                                    q.difficulty === 'Kolay' ? 'bg-emerald-50 text-emerald-600' :
+                                    q.difficulty === 'Orta' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'
+                                  }`}>
+                                    {q.difficulty}
+                                  </span>
+                                </div>
+                                <h4 className="font-serif font-bold text-neutral-800 text-xs sm:text-sm truncate">
+                                  {q.text.substring(0, 120)}...
+                                </h4>
+                              </div>
+                              <div className="shrink-0 w-8 h-8 rounded-full border border-neutral-200 flex items-center justify-center text-neutral-500 font-bold hover:bg-neutral-50">
+                                {isOpen ? '−' : '+'}
+                              </div>
+                            </button>
+
+                            {/* Accordion Content */}
+                            {isOpen && (
+                              <div className="border-t border-neutral-100 bg-neutral-50/50 p-4 sm:p-6 space-y-6 animate-slide-up">
+                                {/* The original question display */}
+                                <div className="bg-white border border-neutral-100 p-4 rounded-xl space-y-2.5 shadow-sm">
+                                  <div className="text-[10px] font-mono uppercase tracking-widest text-indigo-600 font-extrabold">Hatalı Yapılan Orijinal Soru</div>
+                                  <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed font-serif italic">"{q.text}"</p>
+                                  {q.context && <p className="text-xs text-neutral-500 font-medium bg-neutral-50 p-2 rounded border border-neutral-100">{q.context}</p>}
+                                  <p className="text-xs sm:text-sm text-neutral-800 font-bold pt-1.5">{q.query}</p>
+                                </div>
+
+                                {/* Step-by-Step mentorship flow */}
+                                <div className="space-y-4">
+                                  <div className="text-xs font-bold text-neutral-700 uppercase tracking-widest flex items-center gap-1">
+                                    <Bot size={14} className="text-indigo-600" />
+                                    <span>Yapay Zeka Mentorunun Adım Adım İpuçları ve Çözüm Yolu</span>
+                                  </div>
+
+                                  <div className="space-y-4">
+                                    {q.steps.map((step, sIdx) => (
+                                      <div key={sIdx} className="bg-white border border-neutral-200 rounded-2xl p-5 shadow-sm relative overflow-hidden flex flex-col sm:flex-row gap-4">
+                                        {/* Step Number Left Column */}
+                                        <div className="sm:w-16 shrink-0 flex sm:flex-col items-center gap-2">
+                                          <div className="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-black font-serif text-sm shadow-xs">
+                                            {sIdx + 1}
+                                          </div>
+                                          <div className="hidden sm:block w-0.5 h-full bg-neutral-100" />
+                                        </div>
+
+                                        {/* Step Details Right Column */}
+                                        <div className="flex-1 space-y-3">
+                                          <h5 className="font-serif font-black text-neutral-800 text-sm sm:text-base">
+                                            {step.title}
+                                          </h5>
+                                          <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
+                                            {step.desc}
+                                          </p>
+                                          
+                                          {/* Step Highlight Box Tip */}
+                                          <div className="bg-indigo-50/40 border border-indigo-100/50 p-3.5 rounded-xl flex items-start gap-2.5">
+                                            <Lightbulb size={15} className="text-indigo-600 shrink-0 mt-0.5 animate-pulse" />
+                                            <p className="text-[11px] sm:text-xs text-indigo-900 font-semibold leading-relaxed">
+                                              {step.tip}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Left selector - 4 columns */}
             <div className="md:col-span-4 space-y-3">
               <span className="text-[10px] font-mono tracking-widest font-bold text-primary block uppercase">Dolgusal Hata Türü</span>

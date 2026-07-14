@@ -36,6 +36,19 @@ export interface ResourceFile {
   notes?: string;
 }
 
+// Helper to check if the error is related to Firestore being offline or unreachable
+function isOfflineError(error: unknown): boolean {
+  if (!error) return false;
+  const msg = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return (
+    msg.includes('offline') || 
+    msg.includes('unavailable') || 
+    msg.includes('network') || 
+    msg.includes('failed-precondition') ||
+    msg.includes('cannot connect')
+  );
+}
+
 // 1. Get or Create User Profile Settings
 export async function getOrCreateUserProfile(userId: string, defaultSettings: UserSettings): Promise<UserSettings> {
   const path = `users/${userId}`;
@@ -53,6 +66,16 @@ export async function getOrCreateUserProfile(userId: string, defaultSettings: Us
       return defaultSettings;
     }
   } catch (error) {
+    if (isOfflineError(error)) {
+      console.warn("Firestore is offline. Falling back to local settings.");
+      const saved = localStorage.getItem('lgs_settings');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {}
+      }
+      return defaultSettings;
+    }
     handleFirestoreError(error, OperationType.GET, path);
   }
 }
@@ -67,6 +90,10 @@ export async function updateUserProfile(userId: string, settings: Partial<UserSe
       updatedAt: serverTimestamp()
     });
   } catch (error) {
+    if (isOfflineError(error)) {
+      console.warn("Firestore is offline. Save pending or using local cache.");
+      return;
+    }
     handleFirestoreError(error, OperationType.UPDATE, path);
   }
 }
@@ -85,6 +112,10 @@ export async function addSolveHistory(userId: string, solve: SolveHistory): Prom
       solvedAt: serverTimestamp()
     });
   } catch (error) {
+    if (isOfflineError(error)) {
+      console.warn("Firestore is offline. Saved solve history locally.");
+      return;
+    }
     handleFirestoreError(error, OperationType.WRITE, path);
   }
 }
@@ -106,6 +137,16 @@ export async function getSolveHistories(userId: string): Promise<SolveHistory[]>
     });
     return histories;
   } catch (error) {
+    if (isOfflineError(error)) {
+      console.warn("Firestore is offline. Loading solve history from local storage.");
+      const saved = localStorage.getItem('lgs_solve_history');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {}
+      }
+      return [];
+    }
     handleFirestoreError(error, OperationType.LIST, path);
   }
 }
@@ -124,6 +165,10 @@ export async function addCustomResource(userId: string, r: ResourceFile): Promis
       createdAt: serverTimestamp()
     });
   } catch (error) {
+    if (isOfflineError(error)) {
+      console.warn("Firestore is offline. Modified resource locally.");
+      return;
+    }
     handleFirestoreError(error, OperationType.WRITE, path);
   }
 }
@@ -134,6 +179,10 @@ export async function deleteCustomResource(userId: string, id: string): Promise<
   try {
     await deleteDoc(doc(db, 'users', userId, 'resources', id));
   } catch (error) {
+    if (isOfflineError(error)) {
+      console.warn("Firestore is offline. Modified resource locally.");
+      return;
+    }
     handleFirestoreError(error, OperationType.DELETE, path);
   }
 }
@@ -158,6 +207,16 @@ export async function getCustomResources(userId: string): Promise<ResourceFile[]
     });
     return list;
   } catch (error) {
+    if (isOfflineError(error)) {
+      console.warn("Firestore is offline. Loading resources locally.");
+      const saved = localStorage.getItem('lgs_resources');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {}
+      }
+      return [];
+    }
     handleFirestoreError(error, OperationType.LIST, path);
   }
 }
@@ -173,6 +232,10 @@ export async function markResourceCompleted(userId: string, fileId: string): Pro
       completedAt: serverTimestamp()
     });
   } catch (error) {
+    if (isOfflineError(error)) {
+      console.warn("Firestore is offline. Updated completed resources locally.");
+      return;
+    }
     handleFirestoreError(error, OperationType.WRITE, path);
   }
 }
@@ -183,6 +246,10 @@ export async function unmarkResourceCompleted(userId: string, fileId: string): P
   try {
     await deleteDoc(doc(db, 'users', userId, 'completed_resources', docId));
   } catch (error) {
+    if (isOfflineError(error)) {
+      console.warn("Firestore is offline. Updated completed resources locally.");
+      return;
+    }
     handleFirestoreError(error, OperationType.DELETE, path);
   }
 }
@@ -197,6 +264,16 @@ export async function getCompletedResources(userId: string): Promise<string[]> {
     });
     return list;
   } catch (error) {
+    if (isOfflineError(error)) {
+      console.warn("Firestore is offline. Loading completed resources locally.");
+      const saved = localStorage.getItem('lgs_completed_resources');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {}
+      }
+      return [];
+    }
     handleFirestoreError(error, OperationType.LIST, path);
   }
 }

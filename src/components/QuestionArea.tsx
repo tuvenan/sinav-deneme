@@ -11,7 +11,8 @@ import {
   Tag, 
   Layers, 
   Award, 
-  SlidersHorizontal 
+  SlidersHorizontal,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { Question, Difficulty, SolveHistory } from '../types';
@@ -34,6 +35,9 @@ interface QuestionAreaProps {
   setSelectedTopic: (t: string) => void;
   solveHistory: SolveHistory[];
   onSelectQuestion: (q: Question) => void;
+  isFocusMode: boolean;
+  setIsFocusMode: (f: boolean) => void;
+  onFocusStateChange?: (isSolving: boolean) => void;
 }
 
 export default function QuestionArea({
@@ -53,12 +57,29 @@ export default function QuestionArea({
   setSelectedTopic,
   solveHistory,
   onSelectQuestion,
+  isFocusMode,
+  setIsFocusMode,
+  onFocusStateChange,
 }: QuestionAreaProps) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [showLocalHint, setShowLocalHint] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [isFiltersOpen, setIsFiltersOpen] = useState(() => window.innerWidth >= 768);
+  const [isBankOpen, setIsBankOpen] = useState(() => window.innerWidth >= 768);
+
+  // Notify parent of solving state for Focus Mode
+  useEffect(() => {
+    if (onFocusStateChange) {
+      onFocusStateChange(!isSubmitted);
+    }
+    return () => {
+      if (onFocusStateChange) {
+        onFocusStateChange(false);
+      }
+    };
+  }, [isSubmitted, onFocusStateChange]);
 
   // Reset states on question change
   useEffect(() => {
@@ -154,136 +175,214 @@ export default function QuestionArea({
   const currentOption = (question && selectedIdx !== null) ? question.options[selectedIdx] : null;
 
   return (
-    <section className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto bg-surface-bright">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <section className="flex-1 p-1 xs:px-1.5 xs:py-3 sm:p-6 bg-surface-bright overflow-visible">
+      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
         
-        {/* Dynamic Class, Unit, and Topic Selector Navigation Panel */}
-        <div className="bg-white border border-outline rounded-2xl p-5 shadow-sm space-y-4">
-          <div className="flex items-center gap-2 border-b border-outline pb-3">
-            <SlidersHorizontal size={16} className="text-primary" />
-            <span className="text-sm font-black uppercase tracking-wider text-primary">Ders, Ünite ve Konu Seçimi</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Subject Selector */}
-            <div className="space-y-1">
-              <label className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant/70 block">Ders Seçimi</label>
-              <select
-                value={selectedSubject}
-                onChange={(e) => {
-                  setSelectedSubject(e.target.value);
-                  setSelectedUnit('Hepsi');
-                  setSelectedTopic('Hepsi');
-                }}
-                className="w-full bg-surface-dim border border-outline rounded-xl p-2.5 text-xs text-primary font-bold focus:outline-none focus:border-primary"
-              >
-                {subjects.map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
+        {/* Collapsible Panel Toggle Header for Space Optimization on Mobile */}
+        <div className="flex flex-row flex-wrap sm:grid sm:grid-cols-3 gap-2 sm:gap-3">
+          {/* Filters Toggle Button */}
+          <button
+            onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+            className={`flex-1 min-w-[120px] bg-white border rounded-xl p-2.5 sm:p-4 flex items-center justify-between text-[11px] sm:text-xs font-black transition-all cursor-pointer shadow-sm ${
+              isFiltersOpen ? 'border-primary ring-1 ring-primary/10' : 'border-outline hover:border-primary/40'
+            }`}
+          >
+            <div className="flex items-center gap-1.5 sm:gap-2 truncate">
+              <SlidersHorizontal size={14} className="text-primary shrink-0" />
+              <span className="truncate">Filtreler</span>
             </div>
+            <span className="text-[10px] font-bold text-neutral-400 font-mono">
+              {isFiltersOpen ? '▲' : '▼'}
+            </span>
+          </button>
 
-            {/* Unit Selector */}
-            <div className="space-y-1">
-              <label className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant/70 block">Ünite Seçimi</label>
-              <select
-                value={selectedUnit}
-                onChange={(e) => {
-                  setSelectedUnit(e.target.value);
-                  setSelectedTopic('Hepsi');
-                }}
-                className="w-full bg-surface-dim border border-outline rounded-xl p-2.5 text-xs text-primary font-bold focus:outline-none focus:border-primary"
-              >
-                {units.map(u => (
-                  <option key={u} value={u}>{u}</option>
-                ))}
-              </select>
-            </div>
+          {/* Soru Bankası Toggle Button */}
+          {activeBankQuestions.length > 0 && (
+            <button
+              onClick={() => setIsBankOpen(!isBankOpen)}
+              className={`flex-1 min-w-[120px] bg-white border rounded-xl p-2.5 sm:p-4 flex items-center justify-between text-[11px] sm:text-xs font-black transition-all cursor-pointer shadow-sm ${
+                isBankOpen ? 'border-primary ring-1 ring-primary/10' : 'border-outline hover:border-primary/40'
+              }`}
+            >
+              <div className="flex items-center gap-1.5 sm:gap-2 truncate">
+                <Award size={14} className="text-primary shrink-0" />
+                <span className="truncate">Soru Köprüsü ({solvedCount}/{activeBankQuestions.length})</span>
+              </div>
+              <span className="text-[10px] font-bold text-neutral-400 font-mono">
+                {isBankOpen ? '▲' : '▼'}
+              </span>
+            </button>
+          )}
 
-            {/* Topic Selector */}
-            <div className="space-y-1">
-              <label className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant/70 block">Konu Seçimi</label>
-              <select
-                value={selectedTopic}
-                onChange={(e) => setSelectedTopic(e.target.value)}
-                className="w-full bg-surface-dim border border-outline rounded-xl p-2.5 text-xs text-primary font-semibold focus:outline-none focus:border-primary"
-              >
-                {topics.map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
+          {/* Odak Modu Toggle Button */}
+          <button
+            onClick={() => {
+              setIsFocusMode(!isFocusMode);
+              if ('vibrate' in navigator) navigator.vibrate([15]);
+            }}
+            className={`flex-1 min-w-[120px] bg-white border rounded-xl p-2.5 sm:p-4 flex items-center justify-between text-[11px] sm:text-xs font-black transition-all cursor-pointer shadow-sm ${
+              isFocusMode ? 'border-indigo-500 bg-indigo-50/10 ring-1 ring-indigo-500/10' : 'border-outline hover:border-indigo-500/40'
+            }`}
+          >
+            <div className="flex items-center gap-1.5 sm:gap-2 truncate">
+              <div className="relative flex items-center justify-center">
+                <span className={`absolute w-1.5 h-1.5 rounded-full bg-indigo-600 ${isFocusMode ? 'animate-ping' : 'hidden'}`} />
+                <span className={`w-1.5 h-1.5 rounded-full bg-indigo-600 ${isFocusMode ? '' : 'bg-neutral-300'}`} />
+              </div>
+              <span className={`truncate ${isFocusMode ? 'text-indigo-900' : 'text-neutral-500'}`}>Odak Modu</span>
             </div>
-          </div>
+            <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded font-mono ${isFocusMode ? 'bg-indigo-600 text-white' : 'bg-neutral-100 text-neutral-500'}`}>
+              {isFocusMode ? 'Açık' : 'Kapalı'}
+            </span>
+          </button>
         </div>
 
-        {/* 20-Question Bank Dashboard Bridging Indicator */}
-        {activeBankQuestions.length > 0 && (
-          <div className="bg-white border border-outline rounded-2xl p-5 shadow-sm space-y-4 animate-fade-in animate-duration-300">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-outline pb-3">
-              <div className="flex items-center gap-2">
-                <Award size={18} className="text-primary" />
-                <span className="text-sm font-black uppercase tracking-wider text-primary">Soru Bankası Test Çözüm Köprüsü</span>
+        {/* Dynamic Class, Unit, and Topic Selector Navigation Panel */}
+        <AnimatePresence initial={false}>
+          {isFiltersOpen && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="bg-white border border-outline rounded-2xl p-4 sm:p-5 shadow-sm space-y-4 overflow-hidden"
+            >
+              <div className="flex items-center gap-2 border-b border-outline pb-3">
+                <SlidersHorizontal size={16} className="text-primary" />
+                <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-primary">Ders, Ünite ve Konu Seçimi</span>
               </div>
-              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-                <span className="text-on-surface-variant">Durum:</span>
-                <span className="bg-surface-dim px-2.5 py-1 rounded-md border border-outline text-primary font-black animate-pulse">
-                  {solvedCount} / {activeBankQuestions.length} Çözüldü
-                </span>
-                <span className="bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-md border border-emerald-100 font-bold">
-                  Başarı Oranı: %{successRatio}
-                </span>
-              </div>
-            </div>
 
-            {/* Grid display from 1 to 20 */}
-            <div className="flex flex-wrap gap-2 justify-start items-center">
-              {activeBankQuestions.map((q, idx) => {
-                const isCurrent = q.id === question.id;
-                const history = solveHistory.filter(h => h.questionId === q.id);
-                const isSolved = history.length > 0;
-                const isCorrect = isSolved && history[history.length - 1].isCorrect;
-
-                let btnStyle = 'bg-surface-dim text-on-surface-variant border-outline';
-                if (isCurrent) {
-                  btnStyle = 'bg-primary text-white border-primary shadow-md font-extrabold scale-105 ring-2 ring-primary/20';
-                } else if (isSolved) {
-                  btnStyle = isCorrect 
-                    ? 'bg-emerald-500 text-white border-emerald-600 font-bold' 
-                    : 'bg-rose-500 text-white border-rose-600 font-bold';
-                }
-
-                return (
-                  <div
-                    key={q.id}
-                    className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl border flex items-center justify-center text-xs sm:text-sm font-black transition-all select-none ${btnStyle}`}
-                    title={`Soru ${idx + 1}`}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* Subject Selector */}
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant/70 block">Ders Seçimi</label>
+                  <select
+                    value={selectedSubject}
+                    onChange={(e) => {
+                      setSelectedSubject(e.target.value);
+                      setSelectedUnit('Hepsi');
+                      setSelectedTopic('Hepsi');
+                    }}
+                    className="w-full bg-surface-dim border border-outline rounded-xl p-2 sm:p-2.5 text-xs text-primary font-bold focus:outline-none focus:border-primary"
                   >
-                    {idx + 1}
-                  </div>
-                );
-              })}
-            </div>
+                    {subjects.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
 
-            {/* Micro Progress Track */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-[10px] uppercase font-bold tracking-wider text-on-surface-variant/70">
-                <span>Konu Tamamlama Oranı</span>
-                <span>%{progressPercent}</span>
+                {/* Unit Selector */}
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant/70 block">Ünite Seçimi</label>
+                  <select
+                    value={selectedUnit}
+                    onChange={(e) => {
+                      setSelectedUnit(e.target.value);
+                      setSelectedTopic('Hepsi');
+                    }}
+                    className="w-full bg-surface-dim border border-outline rounded-xl p-2 sm:p-2.5 text-xs text-primary font-bold focus:outline-none focus:border-primary"
+                  >
+                    {units.map(u => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Topic Selector */}
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant/70 block">Konu Seçimi</label>
+                  <select
+                    value={selectedTopic}
+                    onChange={(e) => setSelectedTopic(e.target.value)}
+                    className="w-full bg-surface-dim border border-outline rounded-xl p-2 sm:p-2.5 text-xs text-primary font-semibold focus:outline-none focus:border-primary"
+                  >
+                    {topics.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className="w-full bg-surface-dim h-2 rounded-full overflow-hidden border border-outline">
-                <div 
-                  className="bg-primary h-full transition-all duration-500"
-                  style={{ width: `${progressPercent}%` }}
-                />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 20-Question Bank Dashboard Bridging Indicator (Static Visual Items) */}
+        <AnimatePresence initial={false}>
+          {isBankOpen && activeBankQuestions.length > 0 && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="bg-white border border-outline rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-sm space-y-3 sm:space-y-4 overflow-hidden"
+            >
+              <div className="flex items-center justify-between gap-2 border-b border-outline pb-2 sm:pb-3">
+                <div className="flex items-center gap-1.5">
+                  <Award size={15} className="text-primary sm:w-[18px] sm:h-[18px]" />
+                  <span className="text-[10px] sm:text-sm font-black uppercase tracking-wider text-primary">Soru Köprüsü</span>
+                </div>
+                <div className="flex items-center gap-1 sm:gap-2 text-[9px] sm:text-xs font-semibold">
+                  <span className="bg-surface-dim px-1.5 py-0.5 rounded border border-outline text-primary font-black animate-pulse">
+                    {solvedCount}/{activeBankQuestions.length} Çözüldü
+                  </span>
+                  <span className="bg-emerald-50 text-emerald-800 px-1.5 py-0.5 rounded border border-emerald-100 font-bold">
+                    %{successRatio} Başarı
+                  </span>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+
+              {/* Grid display from 1 to 20 as Static visual items to prevent manual jumping */}
+              <div className="flex flex-row flex-nowrap justify-between items-center py-1 w-full gap-[2px] xs:gap-[3px] sm:gap-1 md:gap-1 lg:gap-1.5">
+                {activeBankQuestions.map((q, idx) => {
+                  const isCurrent = q.id === question.id;
+                  const history = solveHistory.filter(h => h.questionId === q.id);
+                  const isSolved = history.length > 0;
+                  const isCorrect = isSolved && history[history.length - 1].isCorrect;
+
+                  let btnStyle = 'bg-surface-dim text-on-surface-variant border-outline';
+                  if (isCurrent) {
+                    btnStyle = 'bg-primary text-white border-primary shadow-xs font-extrabold scale-105 ring-1 sm:ring-2 ring-primary/20';
+                  } else if (isSolved) {
+                    btnStyle = isCorrect 
+                      ? 'bg-emerald-500 text-white border-emerald-600 font-bold' 
+                      : 'bg-rose-500 text-white border-rose-600 font-bold';
+                  }
+
+                  return (
+                    <div
+                      key={q.id}
+                      className={`w-[14px] h-[14px] xs:w-[15px] xs:h-[15px] sm:w-[16px] sm:h-[16px] md:w-[30px] md:h-[30px] lg:w-[34px] lg:h-[34px] xl:w-9 xl:h-9 rounded-[3px] xs:rounded-md sm:rounded-md lg:rounded-xl border flex items-center justify-center text-[8px] xs:text-[9px] sm:text-[10px] md:text-[11px] lg:text-xs xl:text-xs font-black select-none transition-all shrink-0 ${btnStyle}`}
+                      title={isCurrent ? "Şu anki soru" : isSolved ? (isCorrect ? "Doğru çözüldü" : "Yanlış çözüldü") : "Henüz çözülmedi"}
+                    >
+                      {idx + 1}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Micro Progress Track */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-[8px] sm:text-[10px] uppercase font-bold tracking-wider text-on-surface-variant/70">
+                  <span>Konu Tamamlama Oranı</span>
+                  <span>%{progressPercent}</span>
+                </div>
+                <div className="w-full bg-surface-dim h-1 rounded-full overflow-hidden border border-outline">
+                  <div 
+                    className="bg-primary h-full transition-all duration-500"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+
 
         {question ? (
           <>
             {/* Question Card */}
-            <div className="bg-white border border-outline rounded-xl p-5 sm:p-10 shadow-sm relative overflow-hidden">
+            <div className="bg-white border border-outline rounded-xl p-4 sm:p-8 lg:p-10 shadow-sm relative overflow-hidden">
               <AnimatePresence>
                 {isSubmitted && (
                   <motion.div
@@ -303,6 +402,17 @@ export default function QuestionArea({
                           ? 'Sıradaki soruya geçerek başarını sürdür!' 
                           : (question.errorAnalysis || 'Bu konudaki bilgilerini tazelemek için çözümü incele.')}
                       </span>
+                      {!currentOption?.isCorrect && (
+                        <div className="bg-indigo-50 border border-indigo-100 p-3 sm:p-4 rounded-xl flex items-start gap-2.5 max-w-sm mt-1 shadow-xs text-left">
+                          <Sparkles size={16} className="text-indigo-600 shrink-0 mt-0.5 animate-pulse" />
+                          <div>
+                            <span className="text-[10px] font-black uppercase text-indigo-700 block tracking-wide">Yapay Zeka Mentor Tavsiyesi</span>
+                            <p className="text-[11px] text-indigo-950 leading-relaxed font-semibold">
+                              Bu yanlış yaptığın soru türü için sana özel hazırlanan <strong>adım adım çözüm yolları ve taktikleri</strong> "AI Mentor" sayfasında otomatik olarak hazırlandı!
+                            </p>
+                          </div>
+                        </div>
+                      )}
                       <span className="text-xs sm:text-sm font-mono font-medium text-on-surface-variant">
                         Çözüm Süresi: {formatTime(seconds)}
                       </span>
@@ -318,7 +428,7 @@ export default function QuestionArea({
               </AnimatePresence>
 
               <div className="flex flex-col xs:flex-row gap-4 xs:items-center justify-between mb-6 sm:mb-8">
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                   <span className="text-[10px] font-black uppercase tracking-widest bg-surface-dim px-3 py-1 rounded-sm border border-outline text-on-surface-variant">
                     Soru #{question.id}
                   </span>
@@ -328,12 +438,12 @@ export default function QuestionArea({
                     {question.subject}
                   </span>
 
-                  <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-800 px-3 py-1 rounded-sm border border-emerald-100 flex items-center gap-1">
+                  <span className="hidden xs:flex text-[10px] font-semibold bg-emerald-50 text-emerald-800 px-3 py-1 rounded-sm border border-emerald-100 items-center gap-1">
                     <Layers size={10} />
                     {question.unit}
                   </span>
 
-                  <span className="text-[10px] font-medium bg-amber-50 text-amber-800 px-3 py-1 rounded-sm border border-amber-100 flex items-center gap-1">
+                  <span className="hidden sm:flex text-[10px] font-medium bg-amber-50 text-amber-800 px-3 py-1 rounded-sm border border-amber-100 items-center gap-1">
                     <Tag size={10} />
                     {question.topic}
                   </span>
@@ -363,16 +473,16 @@ export default function QuestionArea({
               </div>
 
               <div className="prose prose-slate max-w-none">
-                <h2 className="text-xl sm:text-2xl font-serif text-primary mb-6 sm:mb-8 leading-relaxed font-semibold">
+                <h2 className="text-base sm:text-xl md:text-2xl font-serif text-primary mb-4 sm:mb-8 leading-relaxed font-semibold">
                   {question.text}
                 </h2>
                 {question.imageUrl && (
-                  <div className="mb-6 sm:mb-8 flex flex-col items-center justify-center bg-white border border-outline rounded-xl p-4 shadow-sm overflow-hidden max-w-md mx-auto">
+                  <div className="mb-4 sm:mb-8 flex flex-col items-center justify-center bg-white border border-outline rounded-xl p-4 shadow-sm overflow-hidden max-w-md mx-auto">
                     <span className="text-[9px] font-black uppercase text-on-surface-variant/60 tracking-wider mb-2">Soru Görseli / İpucu</span>
                     <img
                       src={question.imageUrl}
                       alt={`Soru #${question.id} Görsel İpucu`}
-                      className="max-h-[240px] md:max-h-[280px] w-auto object-contain rounded-md"
+                      className="max-h-[200px] md:max-h-[280px] w-auto object-contain rounded-md"
                       referrerPolicy="no-referrer"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
@@ -380,19 +490,19 @@ export default function QuestionArea({
                     />
                   </div>
                 )}
-                <div className="bg-surface-dim border-l-4 border-primary p-4 sm:p-6 mb-6 sm:mb-8 italic text-on-surface-variant text-sm sm:text-base">
-                  <p className="mb-3 sm:mb-4">{question.context}</p>
+                <div className="bg-surface-dim border-l-4 border-primary p-3 xs:p-4 sm:p-6 mb-4 sm:mb-8 italic text-on-surface-variant text-xs sm:text-sm md:text-base">
+                  <p className="mb-2 sm:mb-4">{question.context}</p>
                   <p className="font-bold font-sans not-italic text-primary">{question.query}</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:gap-4">
+              <div className="grid grid-cols-1 gap-2 sm:gap-4">
                 {question.options.map((option, idx) => (
                   <button
                     key={idx}
                     disabled={isSubmitted}
                     onClick={() => setSelectedIdx(idx)}
-                    className={`flex items-center justify-between p-4 sm:p-5 rounded-md border-2 transition-all text-left cursor-pointer ${
+                    className={`flex items-center justify-between p-3 xs:p-4 sm:p-5 rounded-md border-2 transition-all text-left cursor-pointer ${
                       selectedIdx === idx
                         ? 'border-primary bg-primary/5'
                         : 'border-outline bg-white hover:border-primary/40 hover:bg-surface-dim'
@@ -408,7 +518,7 @@ export default function QuestionArea({
                       }`}>
                         {option.label}
                       </div>
-                      <span className="font-semibold text-primary text-base sm:text-lg">{option.value}</span>
+                      <span className="font-semibold text-primary text-xs sm:text-base md:text-lg">{option.value}</span>
                     </div>
                   </button>
                 ))}

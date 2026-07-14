@@ -445,7 +445,7 @@ export default function SettingsView({ solveHistory = [] }: SettingsViewProps) {
   };
 
   return (
-    <div className="p-4 sm:p-8 lg:p-12 max-w-5xl mx-auto space-y-8 animate-slide-up relative">
+    <div className="p-2 xs:p-4 sm:p-8 max-w-5xl mx-auto space-y-4 sm:space-y-8 animate-slide-up relative">
       
       {/* Top Banner Message */}
       {showSaveSuccess && (
@@ -494,7 +494,7 @@ export default function SettingsView({ solveHistory = [] }: SettingsViewProps) {
       </div>
 
       {/* Horizontal / Grid Layout for settings layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="settings-grid grid grid-cols-1 lg:grid-cols-4 gap-6">
         
         {/* Left Side Sub-Navigation Drawer/Sidebar */}
         <div className="lg:col-span-1 space-y-4">
